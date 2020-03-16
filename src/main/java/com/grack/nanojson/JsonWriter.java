@@ -151,7 +151,7 @@ public final class JsonWriter {
 	 * </pre>
 	 */
 	//@formatter:on
-	public static JsonWriter.JsonWriterContext indent(String indent) {
+	public static JsonWriterContext indent(String indent) {
 		if (indent == null) {
 			throw new IllegalArgumentException("indent must be non-null");
 		}

@@ -165,6 +165,80 @@ public final class JsonParser {
 		throw tokener.createParseException(null, "Expected JSON value, got " + token, true);
 	}
 
+	private int advanceTokenOld() throws JsonParserException {
+		tokener.index--;
+		token = tokener.advanceToToken();
+		switch (token) {
+			case JsonTokener.TOKEN_ARRAY_START: // Inlined function to avoid additional stack
+				JsonArray list = new JsonArray();
+				if (advanceToken() != JsonTokener.TOKEN_ARRAY_END)
+					while (true) {
+						list.add(currentValue());
+						if (advanceToken() == JsonTokener.TOKEN_ARRAY_END)
+							break;
+						if (token != JsonTokener.TOKEN_COMMA)
+							throw tokener.createParseException(null,
+									"Expected a comma or end of the array instead of " + token, true);
+						if (advanceToken() == JsonTokener.TOKEN_ARRAY_END)
+							throw tokener.createParseException(null, "Trailing comma found in array", true);
+					}
+				value = list;
+				return token = JsonTokener.TOKEN_ARRAY_START;
+			case JsonTokener.TOKEN_OBJECT_START: // Inlined function to avoid additional stack
+				JsonObject map = new JsonObject();
+				if (advanceToken() != JsonTokener.TOKEN_OBJECT_END)
+					while (true) {
+						if (token != JsonTokener.TOKEN_STRING && token != JsonTokener.TOKEN_SEMI_STRING)
+							throw tokener.createParseException(null, "Expected STRING, got " + token, true);
+						String key = (String)value;
+						if (token == JsonTokener.TOKEN_SEMI_STRING) {
+							if (advanceTokenOld() != JsonTokener.TOKEN_COLON)
+								throw tokener.createParseException(null, "Expected COLON, got " + token, true);
+						} else {
+							if (advanceToken() != JsonTokener.TOKEN_COLON)
+								throw tokener.createParseException(null, "Expected COLON, got " + token, true);
+						}
+						advanceToken();
+						map.put(key, currentValue());
+						if (advanceToken() == JsonTokener.TOKEN_OBJECT_END)
+							break;
+						if (token != JsonTokener.TOKEN_COMMA)
+							throw tokener.createParseException(null,
+									"Expected a comma or end of the object instead of " + token, true);
+						if (advanceToken() == JsonTokener.TOKEN_OBJECT_END)
+							throw tokener.createParseException(null, "Trailing object found in array", true);
+					}
+				value = map;
+				return token = JsonTokener.TOKEN_OBJECT_START;
+			case JsonTokener.TOKEN_TRUE:
+				value = Boolean.TRUE;
+				break;
+			case JsonTokener.TOKEN_FALSE:
+				value = Boolean.FALSE;
+				break;
+			case JsonTokener.TOKEN_NULL:
+				value = null;
+				break;
+			case JsonTokener.TOKEN_STRING:
+				value = tokener.reusableBuffer.toString();
+				break;
+			case JsonTokener.TOKEN_SEMI_STRING:
+				value = tokener.reusableBuffer.toString();
+				break;
+			case JsonTokener.TOKEN_NUMBER:
+//			tokener.consumeTokenNumber();
+				if (lazyNumbers) {
+					value = new JsonLazyNumber(tokener.reusableBuffer.toString(), tokener.isDouble);
+				} else {
+					value = parseNumber();
+				}
+				break;
+			default:
+		}
+
+		return token;
+	}
+
 	/**
 	 * Consumes a token, first eating up any whitespace ahead of it. Note that number tokens are not necessarily valid
 	 * numbers.
@@ -191,11 +265,16 @@ public final class JsonParser {
 			JsonObject map = new JsonObject();
 			if (advanceToken() != JsonTokener.TOKEN_OBJECT_END)
 				while (true) {
-					if (token != JsonTokener.TOKEN_STRING)
+					if (token != JsonTokener.TOKEN_STRING && token != JsonTokener.TOKEN_SEMI_STRING)
 						throw tokener.createParseException(null, "Expected STRING, got " + token, true);
 					String key = (String)value;
-					if (advanceToken() != JsonTokener.TOKEN_COLON)
-						throw tokener.createParseException(null, "Expected COLON, got " + token, true);
+					if (token == JsonTokener.TOKEN_SEMI_STRING) {
+						if (advanceTokenOld() != JsonTokener.TOKEN_COLON)
+							throw tokener.createParseException(null, "Expected COLON, got " + token, true);
+					} else {
+						if (advanceToken() != JsonTokener.TOKEN_COLON)
+							throw tokener.createParseException(null, "Expected COLON, got " + token, true);
+					}
 					advanceToken();
 					map.put(key, currentValue());
 					if (advanceToken() == JsonTokener.TOKEN_OBJECT_END)
@@ -218,6 +297,9 @@ public final class JsonParser {
 			value = null;
 			break;
 		case JsonTokener.TOKEN_STRING:
+			value = tokener.reusableBuffer.toString();
+			break;
+		case JsonTokener.TOKEN_SEMI_STRING:
 			value = tokener.reusableBuffer.toString();
 			break;
 		case JsonTokener.TOKEN_NUMBER:
