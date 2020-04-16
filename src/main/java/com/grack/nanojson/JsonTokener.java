@@ -176,9 +176,22 @@ final class JsonTokener {
 
 		fixupAfterRawBufferRead();
 
-		// The token should end with something other than an ASCII letter
-		if (isAsciiLetter(peekChar()))
+		// The token shouldn't end with something other than an ASCII letter
+		switch (peekChar()) {
+		case ',':
+		case ':':
+		case '{':
+		case '}':
+		case '[':
+		case ']':
+		case ' ':
+		case '\n':
+		case '\r':
+		case '\t':
+			break;
+		default:
 			throw createHelpfulException(first, expected, expected.length);
+		}
 	}
 
 	/**
@@ -201,7 +214,8 @@ final class JsonTokener {
 			state = 2;
 		}
 		
-		outer: while (true) {
+		outer:
+		while (true) {
 			int n = ensureBuffer(BUFFER_ROOM);
 			if (n == 0)
 				break outer;
@@ -312,7 +326,8 @@ final class JsonTokener {
 			reusableBuffer.append(buffer, index - n, n);
 		}
 		
-		outer: while (true) {
+		outer:
+		while (true) {
 			int n = ensureBuffer(BUFFER_ROOM);
 			if (n == 0)
 				throw createParseException(null, "String was not terminated before end of input", true);
@@ -433,12 +448,16 @@ final class JsonTokener {
 					index--;
 					break start;
 				}
+				if (c == '[' || c == ']' || c == '{' || c == '}' || c == ',') {
+					throw createParseException(null, "Invalid character in semi-string: " + c, false);
+				}
 			}
 
 			reusableBuffer.append(buffer, index - n, n);
 		}
 
-		outer: while (true) {
+		outer:
+		while (true) {
 			int n = ensureBuffer(BUFFER_ROOM);
 			if (n == 0)
 				throw createParseException(null, "String was not terminated before end of input", true);
@@ -454,30 +473,36 @@ final class JsonTokener {
 				}
 
 				switch (c) {
-					case ' ':
-					case '\n':
-					case '\r':
-					case '\t':
-					case ':':
-						fixupAfterRawBufferRead();
-						return;
-					case '\\':
-						char escape = buffer[index++];
-						switch (escape) {
-							case 'b':
-								reusableBuffer.append('\b');
-								break;
-							case 'f':
-								reusableBuffer.append('\f');
-								break;
-							case 'n':
-								reusableBuffer.append('\n');
-								break;
-							case 'r':
-								reusableBuffer.append('\r');
-								break;
-							case 't':
-								reusableBuffer.append('\t');
+				case ' ':
+				case '\n':
+				case '\r':
+				case '\t':
+				case ':':
+					fixupAfterRawBufferRead();
+					return;
+				case '[':
+				case ']':
+				case '{':
+				case '}':
+				case ',':
+					throw createParseException(null, "Invalid character in semi-string: \\" + c, false);
+				case '\\':
+					char escape = buffer[index++];
+					switch (escape) {
+						case 'b':
+							reusableBuffer.append('\b');
+							break;
+						case 'f':
+							reusableBuffer.append('\f');
+							break;
+						case 'n':
+							reusableBuffer.append('\n');
+							break;
+						case 'r':
+							reusableBuffer.append('\r');
+							break;
+						case 't':
+							reusableBuffer.append('\t');
 								break;
 							case '"':
 							case '/':
@@ -798,8 +823,8 @@ final class JsonTokener {
 			break;
 		case 'f':
 			try {
-			    consumeKeyword((char)c, JsonTokener.FALSE);
-			    token = TOKEN_FALSE;
+				consumeKeyword((char)c, JsonTokener.FALSE);
+				token = TOKEN_FALSE;
 			} catch (JsonParserException e) {
 				index = oldIndex - 1;
 				consumeTokenSemiString();
@@ -808,7 +833,7 @@ final class JsonTokener {
 			break;
 		case 'n':
 			try {
-			    consumeKeyword((char)c, JsonTokener.NULL);
+				consumeKeyword((char)c, JsonTokener.NULL);
 				token = TOKEN_NULL;
 			} catch (JsonParserException e) {
 				index = oldIndex - 1;
