@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -30,6 +31,8 @@ import java.nio.charset.StandardCharsets;
 final class JsonTokener {
 	// Used by tests
 	static final int BUFFER_SIZE = 32 * 1024;
+
+	static final int MAX_CHAR_BUFFER_SIZE = 1024 * 1024;
 
 	static final int BUFFER_ROOM = 256;
 	static final int MAX_ESCAPE = 5; // uXXXX (don't need the leading slash)
@@ -45,7 +48,7 @@ final class JsonTokener {
 
 	private final boolean utf8;
 
-	protected StringBuilder reusableBuffer = new StringBuilder();
+	protected CharBuffer reusableBuffer = CharBuffer.allocate(MAX_CHAR_BUFFER_SIZE);
 	protected boolean isDouble;
 
 	static final char[] TRUE = { 'r', 'u', 'e' };
@@ -184,8 +187,8 @@ final class JsonTokener {
 	 * Steps through to the end of the current number token (a non-digit token).
 	 */
 	void consumeTokenNumber(char savedChar) throws JsonParserException {
-		reusableBuffer.setLength(0);
-		reusableBuffer.append(savedChar);
+		reusableBuffer.clear();
+		reusableBuffer.put(savedChar);
 		isDouble = false;
 
 		// The JSON spec is way stricter about number formats than
@@ -262,7 +265,7 @@ final class JsonTokener {
 				default:
 					assert false : "Impossible"; // will throw malformed number
 				}
-				reusableBuffer.append(nc);
+				reusableBuffer.put(nc);
 				index++;
 				if (ns == -1)
 					throw createParseException(null, "Malformed number: " + reusableBuffer, true);
@@ -284,7 +287,7 @@ final class JsonTokener {
 	 * Steps through to the end of the current string token (the unescaped double quote).
 	 */
 	void consumeTokenString() throws JsonParserException {
-		reusableBuffer.setLength(0);
+		reusableBuffer.position(0);
 		
 		// Assume no escapes or UTF-8 in the string to start (fast path)
 		start:
@@ -297,18 +300,18 @@ final class JsonTokener {
 				char c = stringChar();
 				if (c == '"') {
 					// Use the index before we fixup
-					reusableBuffer.append(buffer, index - i - 1, i);
+					reusableBuffer.put(buffer, index - i - 1, i);
 					fixupAfterRawBufferRead();
 					return;
 				}
 				if (c == '\\' || (utf8 && (c & 0x80) != 0)) {
-					reusableBuffer.append(buffer, index - i - 1, i);
+					reusableBuffer.put(buffer, index - i - 1, i);
 					index--;
 					break start;
 				}
 			}
 			
-			reusableBuffer.append(buffer, index - n, n);
+			reusableBuffer.put(buffer, index - n, n);
 		}
 		
 		outer: while (true) {
@@ -347,24 +350,24 @@ final class JsonTokener {
 					char escape = buffer[index++];
 					switch (escape) {
 					case 'b':
-						reusableBuffer.append('\b');
+						reusableBuffer.put('\b');
 						break;
 					case 'f':
-						reusableBuffer.append('\f');
+						reusableBuffer.put('\f');
 						break;
 					case 'n':
-						reusableBuffer.append('\n');
+						reusableBuffer.put('\n');
 						break;
 					case 'r':
-						reusableBuffer.append('\r');
+						reusableBuffer.put('\r');
 						break;
 					case 't':
-						reusableBuffer.append('\t');
+						reusableBuffer.put('\t');
 						break;
 					case '"':
 					case '/':
 					case '\\':
-						reusableBuffer.append(escape);
+						reusableBuffer.put(escape);
 						break;
 					case 'u':
 						int escaped = 0;
@@ -384,14 +387,14 @@ final class JsonTokener {
 							}
 						}
 	
-						reusableBuffer.append((char)escaped);
+						reusableBuffer.put((char)escaped);
 						break;
 					default:
 						throw createParseException(null, "Invalid escape: \\" + escape, false);
 					}
 					break;
 				default:
-					reusableBuffer.append(c);
+					reusableBuffer.put(c);
 				}
 			}
 			
@@ -424,7 +427,7 @@ final class JsonTokener {
 			// fall-through
 		case 0xd0:
 			c = (char)((c & 0x1f) << 6 | (buffer[index++] & 0x3f));
-			reusableBuffer.append(c);
+			reusableBuffer.put(c);
 			utf8adjust++;
 			break;
 		case 0xe0:
@@ -434,7 +437,7 @@ final class JsonTokener {
 			if ((c >= '\ud800' && c <= '\udbff') || (c >= '\udc00' && c <= '\udfff'))
 				throw createParseException(null, "Illegal UTF-8 codepoint: 0x" + Integer.toHexString(c),
 						false);
-			reusableBuffer.append(c);
+			reusableBuffer.put(c);
 			break;
 		case 0xf0:
 			if ((c & 0xf) >= 5)
@@ -445,8 +448,8 @@ final class JsonTokener {
 			switch ((c & 0xc) >> 2) {
 			case 0:
 			case 1:
-				reusableBuffer.appendCodePoint((c & 7) << 18 | (buffer[index++] & 0x3f) << 12
-						| (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f));
+				reusableBuffer.put(Character.toChars((c & 7) << 18 | (buffer[index++] & 0x3f) << 12
+						| (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f)));
 				utf8adjust += 3;
 				break;
 			case 2:

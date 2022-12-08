@@ -15,50 +15,52 @@
  */
 package com.grack.nanojson;
 
-import java.math.BigDecimal;
+import ch.randelshofer.fastdoubleparser.JavaBigDecimalParser;
+import ch.randelshofer.fastdoubleparser.JavaDoubleParser;
+import ch.randelshofer.fastdoubleparser.JavaFloatParser;
 
 /**
  * Lazily-parsed number for performance.
  */
 @SuppressWarnings("serial")
 class JsonLazyNumber extends Number {
-	private String value;
+	private char[] value;
 	private boolean isDouble;
 
-	JsonLazyNumber(String number, boolean isDoubleValue) {
+	JsonLazyNumber(char[] number, boolean isDoubleValue) {
 		this.value = number;
 		this.isDouble = isDoubleValue;
 	}
 
 	@Override
 	public double doubleValue() {
-		return Double.parseDouble(value);
+		return JavaDoubleParser.parseDouble(value);
 	}
 
 	@Override
 	public float floatValue() {
-		return Float.parseFloat(value);
+		return JavaFloatParser.parseFloat(value);
 	}
 
 	@Override
 	public int intValue() {
-		return isDouble ? (int)Double.parseDouble(value) : Integer.parseInt(value);
+		return isDouble ? (int)JavaDoubleParser.parseDouble(value) : Integer.parseInt(new String(value));
 	}
 
 	@Override
 	public long longValue() {
-		return isDouble ? (long)Double.parseDouble(value) : Long.parseLong(value);
+		return isDouble ? (long) JavaDoubleParser.parseDouble(value) : Long.parseLong(new String(value));
 	}
 
 	@Override
 	public String toString() {
-		return value;
+		return new String(value);
 	}
 
 	/**
 	 * Avoid serializing {@link JsonLazyNumber}.
 	 */
 	private Object writeReplace() {
-		return new BigDecimal(value);
+		return JavaBigDecimalParser.parseBigDecimal(value);
 	}
 }

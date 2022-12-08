@@ -15,12 +15,15 @@
  */
 package com.grack.nanojson;
 
+import ch.randelshofer.fastdoubleparser.JavaBigIntegerParser;
+import ch.randelshofer.fastdoubleparser.JavaDoubleParser;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.io.StringReader;
-import java.math.BigInteger;
 import java.net.URL;
+import java.util.Arrays;
 
 /**
  * Simple JSON parser.
@@ -36,8 +39,8 @@ public final class JsonParser {
 	private Object value;
 	private int token;
 
-	private JsonTokener tokener;
-	private boolean lazyNumbers;
+	private final JsonTokener tokener;
+	private final boolean lazyNumbers;
 
 	/**
 	 * Returns a type-safe parser context for a {@link JsonObject}, {@link JsonArray} or "any" type from which you can
@@ -81,11 +84,8 @@ public final class JsonParser {
 		 */
 		public T from(URL url) throws JsonParserException {
 			try {
-				InputStream stm = url.openStream();
-				try {
+				try (InputStream stm = url.openStream()) {
 					return from(stm);
-				} finally {
-					stm.close();
 				}
 			} catch (IOException e) {
 				throw new JsonParserException(e, "IOException opening URL", 1, 1, 0);
@@ -218,11 +218,15 @@ public final class JsonParser {
 			value = null;
 			break;
 		case JsonTokener.TOKEN_STRING:
-			value = tokener.reusableBuffer.toString();
+			char[] chars = tokener.reusableBuffer.array();
+			chars = Arrays.copyOf(chars, tokener.reusableBuffer.position());
+			value = new String(chars);
 			break;
 		case JsonTokener.TOKEN_NUMBER:
 			if (lazyNumbers) {
-				value = new JsonLazyNumber(tokener.reusableBuffer.toString(), tokener.isDouble);
+				chars = tokener.reusableBuffer.array();
+				chars = Arrays.copyOf(chars, tokener.reusableBuffer.position());
+				value = new JsonLazyNumber(chars, tokener.isDouble);
 			} else {
 				value = parseNumber();
 			}
@@ -234,31 +238,33 @@ public final class JsonParser {
 	}
 
 	private Number parseNumber() throws JsonParserException {
-		String number = tokener.reusableBuffer.toString();
+		char[] number = tokener.reusableBuffer.array();
+		number = Arrays.copyOf(number, tokener.reusableBuffer.position());
+		int numLength = number.length;
 
 		try {
 			if (tokener.isDouble)
-				return Double.parseDouble(number);
+				return JavaDoubleParser.parseDouble(number);
 
 			// Quick parse for single-digits
-			if (number.length() == 1) {
-				return number.charAt(0) - '0';
-			} else if (number.length() == 2 && number.charAt(0) == '-') {
-				return '0' - number.charAt(1);
+			if (numLength == 1) {
+				return number[0] - '0';
+			} else if (numLength == 2 && number[0] == '-') {
+				return '0' - number[1];
 			}
 
 			// HACK: Attempt to parse using the approximate best type for this
-			boolean firstMinus = number.charAt(0) == '-';
-			int length = firstMinus ? number.length() - 1 : number.length();
+			boolean firstMinus = number[0] == '-';
+			int length = firstMinus ? numLength - 1 : numLength;
 			// CHECKSTYLE_OFF: MagicNumber
-			if (length < 10 || (length == 10 && number.charAt(firstMinus ? 1 : 0) < '2')) // 2 147 483 647
-				return Integer.parseInt(number);
-			if (length < 19 || (length == 19 && number.charAt(firstMinus ? 1 : 0) < '9')) // 9 223 372 036 854 775 807
-				return Long.parseLong(number);
+			if (length < 10 || (length == 10 && number[firstMinus ? 1 : 0] < '2')) // 2 147 483 647
+				return Integer.parseInt(new String(number));
+			if (length < 19 || (length == 19 && number[firstMinus ? 1 : 0] < '9')) // 9 223 372 036 854 775 807
+				return Long.parseLong(new String(number));
 			// CHECKSTYLE_ON: MagicNumber
-			return new BigInteger(number);
+			return JavaBigIntegerParser.parseBigInteger(number);
 		} catch (NumberFormatException e) {
-			throw tokener.createParseException(e, "Malformed number: " + number, true);
+			throw tokener.createParseException(e, "Malformed number: " + new String(number), true);
 		}
 	}
 }
