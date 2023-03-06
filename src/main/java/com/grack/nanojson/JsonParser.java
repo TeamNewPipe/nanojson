@@ -50,7 +50,7 @@ public final class JsonParser {
 	 */
 	public static final class JsonParserContext<T> {
 		private final Class<T> clazz;
-		private boolean lazyNumbers;
+		private boolean lazyNumbers = true;
 
 		JsonParserContext(Class<T> clazz) {
 			this.clazz = clazz;
