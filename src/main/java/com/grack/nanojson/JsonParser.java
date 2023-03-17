@@ -41,6 +41,7 @@ public final class JsonParser {
 
 	private final JsonTokener tokener;
 	private final boolean lazyNumbers;
+	private final boolean lazyStrings;
 
 	/**
 	 * Returns a type-safe parser context for a {@link JsonObject}, {@link JsonArray} or "any" type from which you can
@@ -51,6 +52,7 @@ public final class JsonParser {
 	public static final class JsonParserContext<T> {
 		private final Class<T> clazz;
 		private boolean lazyNumbers = true;
+		private boolean lazyStrings = true;
 
 		JsonParserContext(Class<T> clazz) {
 			this.clazz = clazz;
@@ -66,17 +68,26 @@ public final class JsonParser {
 		}
 
 		/**
+		 * Parses Strings lazily, allowing us to defer some of the cost of String
+		 * construction until later.
+		 */
+		public JsonParserContext<T> withLazyStrings() {
+			lazyStrings = true;
+			return this;
+		}
+
+		/**
 		 * Parses the current JSON type from a {@link String}.
 		 */
 		public T from(String s) throws JsonParserException {
-			return new JsonParser(new JsonTokener(new StringReader(s)), lazyNumbers).parse(clazz);
+			return new JsonParser(new JsonTokener(new StringReader(s)), lazyNumbers, lazyStrings).parse(clazz);
 		}
 
 		/**
 		 * Parses the current` JSON type from a {@link Reader}.
 		 */
 		public T from(Reader r) throws JsonParserException {
-			return new JsonParser(new JsonTokener(r), lazyNumbers).parse(clazz);
+			return new JsonParser(new JsonTokener(r), lazyNumbers, lazyStrings).parse(clazz);
 		}
 
 		/**
@@ -96,13 +107,14 @@ public final class JsonParser {
 		 * Parses the current JSON type from a {@link InputStream}. Detects the encoding from the input stream.
 		 */
 		public T from(InputStream stm) throws JsonParserException {
-			return new JsonParser(new JsonTokener(stm), lazyNumbers).parse(clazz);
+			return new JsonParser(new JsonTokener(stm), lazyNumbers, lazyStrings).parse(clazz);
 		}
 	}
 
-	JsonParser(JsonTokener tokener, boolean lazyNumbers) throws JsonParserException {
+	JsonParser(JsonTokener tokener, boolean lazyNumbers, boolean lazyStrings) throws JsonParserException {
 		this.tokener = tokener;
 		this.lazyNumbers = lazyNumbers;
+		this.lazyStrings = lazyStrings;
 	}
 
 	/**
@@ -193,7 +205,7 @@ public final class JsonParser {
 				while (true) {
 					if (token != JsonTokener.TOKEN_STRING)
 						throw tokener.createParseException(null, "Expected STRING, got " + token, true);
-					String key = (String)value;
+					String key = lazyStrings ? value.toString() : (String) value;
 					if (advanceToken() != JsonTokener.TOKEN_COLON)
 						throw tokener.createParseException(null, "Expected COLON, got " + token, true);
 					advanceToken();
@@ -220,7 +232,7 @@ public final class JsonParser {
 		case JsonTokener.TOKEN_STRING:
 			char[] chars = tokener.reusableBuffer.array();
 			chars = Arrays.copyOf(chars, tokener.reusableBuffer.position());
-			value = new String(chars);
+			value = lazyStrings ? new LazyString(chars) : new String(chars);
 			break;
 		case JsonTokener.TOKEN_NUMBER:
 			if (lazyNumbers) {
