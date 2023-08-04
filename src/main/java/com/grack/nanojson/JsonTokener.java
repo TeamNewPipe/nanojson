@@ -32,7 +32,7 @@ final class JsonTokener {
 	// Used by tests
 	static final int BUFFER_SIZE = 32 * 1024;
 
-	static final int MAX_CHAR_BUFFER_SIZE = 1024 * 1024;
+	static final int MAX_CHAR_BUFFER_SIZE = 512;
 
 	static final int BUFFER_ROOM = 256;
 	static final int MAX_ESCAPE = 5; // uXXXX (don't need the leading slash)
@@ -300,17 +300,20 @@ final class JsonTokener {
 				char c = stringChar();
 				if (c == '"') {
 					// Use the index before we fixup
+					expandBufferIfNeeded(i);
 					reusableBuffer.put(buffer, index - i - 1, i);
 					fixupAfterRawBufferRead();
 					return;
 				}
 				if (c == '\\' || (utf8 && (c & 0x80) != 0)) {
+					expandBufferIfNeeded(i);
 					reusableBuffer.put(buffer, index - i - 1, i);
 					index--;
 					break start;
 				}
 			}
-			
+
+			expandBufferIfNeeded(n);
 			reusableBuffer.put(buffer, index - n, n);
 		}
 		
@@ -727,6 +730,14 @@ final class JsonTokener {
 	void fixupAfterRawBufferRead() throws JsonParserException {
 		if (index >= bufferLength)
 			eof = refillBuffer();
+	}
+
+	private void expandBufferIfNeeded(int size) {
+		if (reusableBuffer.remaining() < size) {
+			CharBuffer newBuffer = CharBuffer.allocate(reusableBuffer.capacity() + 512);
+			newBuffer.put(reusableBuffer);
+			reusableBuffer = newBuffer;
+		}
 	}
 
 	/**
