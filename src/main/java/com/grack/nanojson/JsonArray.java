@@ -18,6 +18,7 @@ package com.grack.nanojson;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.stream.Stream;
 
 /**
  * Extends an {@link ArrayList} with helper methods to determine the underlying JSON type of the list element.
@@ -255,5 +256,21 @@ public class JsonArray extends ArrayList<Object> {
 	public boolean isString(int key) {
 		Object o = get(key);
 		return o instanceof LazyString || o instanceof String;
+	}
+
+	/**
+	 * Shortcut method to create a stream with only objects of these classes.
+	 */
+	public <T> Stream<T> streamAs(Class<T> clazz) {
+		return stream()
+			.filter(clazz::isInstance)
+			.map(clazz::cast);
+	}
+
+	/**
+	 *  Shortcut method to create a stream that only contains {@link JsonObject JsonObjects}.
+	 */
+	public Stream<JsonObject> streamAsJsonObjects() {
+		return streamAs(JsonObject.class);
 	}
 }
