@@ -18,6 +18,8 @@ package com.grack.nanojson;
 import ch.randelshofer.fastdoubleparser.JavaDoubleParser;
 import ch.randelshofer.fastdoubleparser.JavaFloatParser;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.io.StringReader;
@@ -28,14 +30,14 @@ import java.util.BitSet;
 /**
  * Streaming reader for JSON documents.
  */
-public final class JsonReader {
+public final class JsonReader implements Closeable {
 	private JsonTokener tokener;
 	private int token;
 	private BitSet states = new BitSet();
 	private int stateIndex = 0;
 	private boolean inObject;
 	private boolean first = true;
-	private CharBuffer key = CharBuffer.allocate(1024);
+	private CharBuffer key = CharBufferPool.get(1024);
 
 	/**
 	 * The type of value that the {@link JsonReader} is positioned over.
@@ -102,7 +104,8 @@ public final class JsonReader {
 	 */
 	public boolean pop() throws JsonParserException {
 		// CHECKSTYLE_OFF: EmptyStatement
-		while (!next());
+		while (!next())
+			;
 		// CHECKSTYLE_ON: EmptyStatement
 		first = false;
 		inObject = states.get(--stateIndex);
@@ -114,23 +117,23 @@ public final class JsonReader {
 	 */
 	public Type current() throws JsonParserException {
 		switch (token) {
-		case JsonTokener.TOKEN_TRUE:
-		case JsonTokener.TOKEN_FALSE:
-			return Type.BOOLEAN;
-		case JsonTokener.TOKEN_NULL:
-			return Type.NULL;
-		case JsonTokener.TOKEN_NUMBER:
-			return Type.NUMBER;
-		case JsonTokener.TOKEN_STRING:
-			return Type.STRING;
-		case JsonTokener.TOKEN_OBJECT_START:
-			return Type.OBJECT;
-		case JsonTokener.TOKEN_ARRAY_START:
-			return Type.ARRAY;
-		default:				
-			throw createTokenMismatchException(JsonTokener.TOKEN_NULL, JsonTokener.TOKEN_TRUE, 
-					JsonTokener.TOKEN_FALSE, JsonTokener.TOKEN_NUMBER, JsonTokener.TOKEN_STRING,
-					JsonTokener.TOKEN_OBJECT_START, JsonTokener.TOKEN_ARRAY_START);
+			case JsonTokener.TOKEN_TRUE:
+			case JsonTokener.TOKEN_FALSE:
+				return Type.BOOLEAN;
+			case JsonTokener.TOKEN_NULL:
+				return Type.NULL;
+			case JsonTokener.TOKEN_NUMBER:
+				return Type.NUMBER;
+			case JsonTokener.TOKEN_STRING:
+				return Type.STRING;
+			case JsonTokener.TOKEN_OBJECT_START:
+				return Type.OBJECT;
+			case JsonTokener.TOKEN_ARRAY_START:
+				return Type.ARRAY;
+			default:
+				throw createTokenMismatchException(JsonTokener.TOKEN_NULL, JsonTokener.TOKEN_TRUE,
+						JsonTokener.TOKEN_FALSE, JsonTokener.TOKEN_NUMBER, JsonTokener.TOKEN_STRING,
+						JsonTokener.TOKEN_OBJECT_START, JsonTokener.TOKEN_ARRAY_START);
 		}
 	}
 
@@ -146,7 +149,8 @@ public final class JsonReader {
 	}
 
 	/**
-	 * Reads the key for the object at the current value. Does not advance to the next value.
+	 * Reads the key for the object at the current value. Does not advance to the
+	 * next value.
 	 */
 	public String key() throws JsonParserException {
 		if (!inObject)
@@ -172,19 +176,20 @@ public final class JsonReader {
 	 */
 	public Object value() throws JsonParserException {
 		switch (token) {
-		case JsonTokener.TOKEN_TRUE:
-			return true;
-		case JsonTokener.TOKEN_FALSE:
-			return false;
-		case JsonTokener.TOKEN_NULL:
-			return null;
-		case JsonTokener.TOKEN_NUMBER:
-			return number();
-		case JsonTokener.TOKEN_STRING:
-			return string();
-		default:				
-			throw createTokenMismatchException(JsonTokener.TOKEN_NULL, JsonTokener.TOKEN_TRUE, JsonTokener.TOKEN_FALSE,
-					JsonTokener.TOKEN_NUMBER, JsonTokener.TOKEN_STRING);
+			case JsonTokener.TOKEN_TRUE:
+				return true;
+			case JsonTokener.TOKEN_FALSE:
+				return false;
+			case JsonTokener.TOKEN_NULL:
+				return null;
+			case JsonTokener.TOKEN_NUMBER:
+				return number();
+			case JsonTokener.TOKEN_STRING:
+				return string();
+			default:
+				throw createTokenMismatchException(JsonTokener.TOKEN_NULL, JsonTokener.TOKEN_TRUE,
+						JsonTokener.TOKEN_FALSE,
+						JsonTokener.TOKEN_NUMBER, JsonTokener.TOKEN_STRING);
 		}
 	}
 
@@ -271,16 +276,16 @@ public final class JsonReader {
 	/**
 	 * Advance to the next value in this array or object. If no values remain,
 	 * return to the parent array or object.
-	 * 
+	 *
 	 * @return true if we still have values to read in this array or object,
 	 *         false if we have completed this object (and implicitly moved back
 	 *         to the parent array or object)
 	 */
 	public boolean next() throws JsonParserException {
 		if (stateIndex == 0) {
-			throw tokener.createParseException(null, "Unabled to call next() at the root", true); 
+			throw tokener.createParseException(null, "Unabled to call next() at the root", true);
 		}
-		
+
 		token = tokener.advanceToToken();
 
 		if (inObject) {
@@ -289,7 +294,7 @@ public final class JsonReader {
 				first = false;
 				return false;
 			}
-			
+
 			if (!first) {
 				if (token != JsonTokener.TOKEN_COMMA)
 					throw createTokenMismatchException(JsonTokener.TOKEN_COMMA, JsonTokener.TOKEN_OBJECT_END);
@@ -327,13 +332,28 @@ public final class JsonReader {
 					JsonTokener.TOKEN_OBJECT_START, JsonTokener.TOKEN_ARRAY_START);
 
 		first = false;
-		
+
 		return true;
 	}
-	
+
+	/**
+	 * Releases resources used by this JsonReader. Should be called when done
+	 * reading.
+	 */
+	@Override
+	public void close() throws IOException {
+		if (key != null) {
+			CharBufferPool.release(key);
+			key = null;
+		}
+		if (tokener != null) {
+			tokener.close();
+		}
+	}
+
 	private JsonParserException createTokenMismatchException(int... t) {
 		return tokener.createParseException(null, "token mismatch (expected " + Arrays.toString(t)
-						+ ", was " + token + ")",
+				+ ", was " + token + ")",
 				true);
 	}
 }

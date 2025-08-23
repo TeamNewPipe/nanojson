@@ -174,7 +174,7 @@
                 <configuration>
                     <debug>true</debug>
                     <debuglevel>none</debuglevel>
-                    <release>8</release>
+                    <release>17</release>
                     <compilerArgument>-Xlint:all</compilerArgument>
                     <compilerArguments>
                         <Werror />

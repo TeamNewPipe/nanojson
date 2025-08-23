@@ -26,9 +26,9 @@ import java.util.Map;
  * Internal class that handles emitting to an {@link Appendable}. Users only see
  * the public subclasses, {@link JsonStringWriter} and
  * {@link JsonAppendableWriter}.
- * 
+ *
  * @param <SELF>
- *            A subclass of {@link JsonWriterBase}.
+ *               A subclass of {@link JsonWriterBase}.
  */
 class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 		JsonSink<SELF> {
@@ -124,8 +124,9 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 			Object o = entry.getValue();
 			if (!(entry.getKey() instanceof String))
 				throw new JsonWriterException("Invalid key type for map: "
-						+ (entry.getKey() == null ? "null" : entry.getKey()
-								.getClass()));
+						+ (entry.getKey() == null ? "null"
+								: entry.getKey()
+										.getClass()));
 			String k = (String) entry.getKey();
 			value(k, o);
 		}
@@ -153,6 +154,8 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 			return nul();
 		else if (o instanceof String)
 			return value((String) o);
+		else if (o instanceof LazyString)
+			return value(o.toString());
 		else if (o instanceof Number)
 			return value(((Number) o));
 		else if (o instanceof Boolean)
@@ -180,6 +183,8 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 			return nul(key);
 		else if (o instanceof String)
 			return value(key, (String) o);
+		else if (o instanceof LazyString)
+			return value(key, o.toString());
 		else if (o instanceof Number)
 			return value(key, (Number) o);
 		else if (o instanceof Boolean)
@@ -390,10 +395,12 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 
 	/**
 	 * Ensures that the object is in the finished state.
-	 * 
+	 *
 	 * @throws JsonWriterException
-	 *             if the written JSON is not properly balanced, ie: all arrays
-	 *             and objects that were started have been properly ended.
+	 *                             if the written JSON is not properly balanced, ie:
+	 *                             all arrays
+	 *                             and objects that were started have been properly
+	 *                             ended.
 	 */
 	protected void doneInternal() {
 		if (stateIndex > 0)
@@ -450,7 +457,7 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 		if (utf8) {
 			if (bo + 1 > BUFFER_SIZE)
 				flush();
-			bb[bo++] = (byte)c;
+			bb[bo++] = (byte) c;
 		} else {
 			buffer.append(c);
 			if (buffer.length() > BUFFER_SIZE) {
@@ -530,82 +537,105 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 			c = s.charAt(i);
 
 			switch (c) {
-			case '\\':
-			case '"':
-				raw('\\');
-				raw(c);
-				break;
-			case '/':
-				// Special case to ensure that </script> doesn't appear in JSON
-				// output
-				if (b == '<')
+				case '\\':
+				case '"':
 					raw('\\');
-				raw(c);
-				break;
-			case '\b':
-				raw("\\b");
-				break;
-			case '\t':
-				raw("\\t");
-				break;
-			case '\n':
-				raw("\\n");
-				break;
-			case '\f':
-				raw("\\f");
-				break;
-			case '\r':
-				raw("\\r");
-				break;
-			default:
-				if (shouldBeEscaped(c)) {
-					if (c < 0x100) {
-						raw(UNICODE_SMALL);
-						raw(HEX[(c >> 4) & 0xf]);
-						raw(HEX[c & 0xf]);
-					} else {
-						raw(UNICODE_LARGE);
-						raw(HEX[(c >> 12) & 0xf]);
-						raw(HEX[(c >> 8) & 0xf]);
-						raw(HEX[(c >> 4) & 0xf]);
-						raw(HEX[c & 0xf]);
-					}
-				} else {
-					if (utf8) {
-						if (bo + 4 > BUFFER_SIZE) // 4 is the max char size
-							flush();
-						if (c < 0x80) {
-							bb[bo++] = (byte) c;
-						} else if (c < 0x800) {
-							bb[bo++] = (byte) (0xc0 | c >> 6);
-							bb[bo++] = (byte) (0x80 | c & 0x3f);
-						} else if (c < 0xd800) {
-							bb[bo++] = (byte) (0xe0 | c >> 12);
-							bb[bo++] = (byte) (0x80 | (c >> 6) & 0x3f);
-							bb[bo++] = (byte) (0x80 | c & 0x3f);
-						} else if (c < 0xdfff) {
-							// TODO: bad surrogates
-							i++;
-
-							int fc = Character.toCodePoint(c, s.charAt(i));
-							if (fc < 0x1fffff) {
-								bb[bo++] = (byte) (0xf0 | fc >> 18);
-								bb[bo++] = (byte) (0x80 | (fc >> 12) & 0x3f);
-								bb[bo++] = (byte) (0x80 | (fc >> 6) & 0x3f);
-								bb[bo++] = (byte) (0x80 | fc & 0x3f);
-							} else {
-								throw new JsonWriterException("Unable to encode character 0x" 
-										+ Integer.toHexString(fc));
-							}
+					raw(c);
+					break;
+				case '/':
+					// Special case to ensure that </script> doesn't appear in JSON
+					// output
+					if (b == '<')
+						raw('\\');
+					raw(c);
+					break;
+				case '\b':
+					raw("\\b");
+					break;
+				case '\t':
+					raw("\\t");
+					break;
+				case '\n':
+					raw("\\n");
+					break;
+				case '\f':
+					raw("\\f");
+					break;
+				case '\r':
+					raw("\\r");
+					break;
+				default:
+					if (shouldBeEscaped(c)) {
+						if (c < 0x100) {
+							raw(UNICODE_SMALL);
+							raw(HEX[(c >> 4) & 0xf]);
+							raw(HEX[c & 0xf]);
 						} else {
-							bb[bo++] = (byte) (0xe0 | c >> 12);
-							bb[bo++] = (byte) (0x80 | (c >> 6) & 0x3f);
-							bb[bo++] = (byte) (0x80 | c & 0x3f);
+							raw(UNICODE_LARGE);
+							raw(HEX[(c >> 12) & 0xf]);
+							raw(HEX[(c >> 8) & 0xf]);
+							raw(HEX[(c >> 4) & 0xf]);
+							raw(HEX[c & 0xf]);
 						}
 					} else {
-						raw(c);
+						if (utf8) {
+							// Ensure space for the largest possible UTF-8 sequence (4 bytes) before
+							// encoding. Even if this char ultimately encodes to 1,2 or 3 bytes,
+							// reserving for 4 keeps logic simple and guarantees we never start a
+							// multi-byte sequence that would be split across a flush.
+							if (bo + 4 > BUFFER_SIZE) // 4 is the max UTF-8 byte length for a single Unicode scalar
+														// value
+								flush();
+							if (c < 0x80) {
+								bb[bo++] = (byte) c;
+							} else if (c < 0x800) {
+								bb[bo++] = (byte) (0xc0 | c >> 6);
+								bb[bo++] = (byte) (0x80 | c & 0x3f);
+							} else if (c < 0xd800) {
+								bb[bo++] = (byte) (0xe0 | c >> 12);
+								bb[bo++] = (byte) (0x80 | (c >> 6) & 0x3f);
+								bb[bo++] = (byte) (0x80 | c & 0x3f);
+							} else if (Character.isHighSurrogate(c)) {
+								// Surrogate pair handling (supplementary plane character)
+								// We have a high surrogate; must be followed by a low surrogate to form a valid
+								// code point.
+								if (i + 1 >= s.length()) {
+									throw new JsonWriterException("Invalid high surrogate at end of string");
+								}
+								char lowSurrogate = s.charAt(i + 1);
+								if (!Character.isLowSurrogate(lowSurrogate)) {
+									throw new JsonWriterException(
+											"Invalid surrogate pair: high surrogate not followed by low surrogate");
+								}
+								// Need 4 bytes for any supplementary code point in UTF-8. Flush first if
+								// insufficient space
+								// so the 4-byte sequence is never split across buffers.
+								if (bo + 4 > BUFFER_SIZE)
+									flush();
+								i++; // consume the low surrogate
+								int fc = Character.toCodePoint(c, lowSurrogate); // full scalar value
+								// Unicode scalar values are defined only up to U+10FFFF
+								// (exclusive upper bound 0x110000).
+								if (fc < 0x110000) {
+									bb[bo++] = (byte) (0xf0 | (fc >> 18));
+									bb[bo++] = (byte) (0x80 | (fc >> 12) & 0x3f);
+									bb[bo++] = (byte) (0x80 | (fc >> 6) & 0x3f);
+									bb[bo++] = (byte) (0x80 | fc & 0x3f);
+								} else {
+									throw new JsonWriterException(
+											"Unable to encode character 0x" + Integer.toHexString(fc));
+								}
+							} else if (Character.isLowSurrogate(c)) {
+								throw new JsonWriterException("Invalid low surrogate without preceding high surrogate");
+							} else {
+								bb[bo++] = (byte) (0xe0 | c >> 12);
+								bb[bo++] = (byte) (0x80 | (c >> 6) & 0x3f);
+								bb[bo++] = (byte) (0x80 | c & 0x3f);
+							}
+						} else {
+							raw(c);
+						}
 					}
-				}
 			}
 		}
 
@@ -621,8 +651,11 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 	}
 
 	/**
-	 * Returns true if the number becomes null when converted to JSON. json.org spec does not specify
-	 * NaN or Infinity as numbers, and modern JavaScript engines convert them to null.
+	 * Returns true if the number becomes null when converted to JSON. json.org spec
+	 * does not specify
+	 * NaN or Infinity as numbers, and modern JavaScript engines convert them to
+	 * null.
+	 *
 	 * @param n a number
 	 * @return true if the number is nullish.
 	 */
@@ -631,10 +664,10 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 			Double d = (Double) n;
 			return d.isNaN() || d.isInfinite();
 		}
-        if (n instanceof Float) {
+		if (n instanceof Float) {
 			Float f = (Float) n;
 			return f.isNaN() || f.isInfinite();
-        }
-        return false;
+		}
+		return false;
 	}
 }
