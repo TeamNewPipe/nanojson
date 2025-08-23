@@ -1,12 +1,12 @@
 /*
  * Copyright 2011 The nanojson Authors
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -26,7 +26,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.zip.ZipEntry;
@@ -62,31 +61,28 @@ class JsonParserTest {
 						.getClass());
 	}
 
-
 	@Test
 	void writerOutput() throws JsonParserException {
 		//@formatter:off
 		String json = JsonWriter.string()
-				.object()
-					.object("a")
-						.array("b")
-							.object()
-								.value("a", 1)
-								.value("b", 2)
-							.end()
-							.object()
-								.value("c", 1.0)
-								.value("d", 2.0)
-							.end()
+			.object()
+				.object("a")
+					.array("b")
+						.object()
+							.value("a", 1)
+							.value("b", 2)
 						.end()
-						.value("c", JsonArray.from("v0", "v1", "v2"))
+						.object()
+							.value("c", 1.0)
+							.value("d", 2.0)
+						.end()
 					.end()
+					.value("c", JsonArray.from("v0", "v1", "v2"))
 				.end()
-			.done();
+			.end()
+		.done();
 		//@formatter:on
-		
-		// Just make sure it can be read - don't validate
-		JsonParser.object().from(json);
+		JsonParser.object().from(json); // ensure parseable
 	}
 
 	@Test
@@ -105,8 +101,8 @@ class JsonParserTest {
 	void objectTwoElements() throws JsonParserException {
 		JsonObject obj = JsonParser.object().from("{\"a\":1,\"B\":1}");
 		assertEquals(JsonObject.class, obj.getClass());
-		assertEquals(1, obj.get("B"));
-		assertEquals(1, obj.get("a"));
+		assertEquals(1, obj.getInt("B"));
+		assertEquals(1, obj.getInt("a"));
 		assertEquals(2, obj.size());
 	}
 
@@ -142,7 +138,7 @@ class JsonParserTest {
 	@Test
 	void arrayWithEverything() throws JsonParserException {
 		JsonArray a = JsonParser.array().from("[1, -1.0e6, \"abc\", [1,2,3], {\"abc\":123}, true, false]");
-		assertEquals("[1, -1000000.0, abc, [1, 2, 3], {abc=123}, true, false]", a.toString());
+		assertEquals("[1, -1.0e6, abc, [1, 2, 3], {abc=123}, true, false]", a.toString());
 		assertEquals(1.0, a.getDouble(0), 0.001f);
 		assertEquals(1, a.getInt(0));
 		assertEquals(-1000000, a.getInt(1));
@@ -162,9 +158,9 @@ class JsonParserTest {
 
 		assertNull(o.get("jkl"));
 		assertTrue(o.containsKey("jkl"));
-		assertEquals(123, o.get("abc"));
+		assertEquals(123, ((Number) o.get("abc")).intValue());
 		assertEquals(Arrays.asList(true, false), o.get("ghi"));
-		assertEquals(456.0, o.get("def"));
+		assertEquals(456.0, ((Number) o.get("def")).doubleValue());
 		assertEquals(true, o.get("mno"));
 		assertEquals(5, o.size());
 
@@ -178,42 +174,42 @@ class JsonParserTest {
 
 	@Test
 	void stringEscapes() throws JsonParserException {
-		assertEquals("\n", JsonParser.any().from("\"\\n\""));
-		assertEquals("\r", JsonParser.any().from("\"\\r\""));
-		assertEquals("\t", JsonParser.any().from("\"\\t\""));
-		assertEquals("\b", JsonParser.any().from("\"\\b\""));
-		assertEquals("\f", JsonParser.any().from("\"\\f\""));
-		assertEquals("/", JsonParser.any().from("\"/\""));
-		assertEquals("\\", JsonParser.any().from("\"\\\\\""));
-		assertEquals("\"", JsonParser.any().from("\"\\\"\""));
-		assertEquals("\0", JsonParser.any().from("\"\\u0000\""));
-		assertEquals("\u8000", JsonParser.any().from("\"\\u8000\""));
-		assertEquals("\uffff", JsonParser.any().from("\"\\uffff\""));
-		assertEquals("\uFFFF", JsonParser.any().from("\"\\uFFFF\""));
+		assertEquals("\n", JsonParser.any().from("\"\\n\"").toString());
+		assertEquals("\r", JsonParser.any().from("\"\\r\"").toString());
+		assertEquals("\t", JsonParser.any().from("\"\\t\"").toString());
+		assertEquals("\b", JsonParser.any().from("\"\\b\"").toString());
+		assertEquals("\f", JsonParser.any().from("\"\\f\"").toString());
+		assertEquals("/", JsonParser.any().from("\"/\"").toString());
+		assertEquals("\\", JsonParser.any().from("\"\\\\\"").toString());
+		assertEquals("\"", JsonParser.any().from("\"\\\"\"").toString());
+		assertEquals("\0", JsonParser.any().from("\"\\u0000\"").toString());
+		assertEquals("\u8000", JsonParser.any().from("\"\\u8000\"").toString());
+		assertEquals("\uffff", JsonParser.any().from("\"\\uffff\"").toString());
+		assertEquals("\uFFFF", JsonParser.any().from("\"\\uFFFF\"").toString());
 
 		assertEquals("all together: \\/\n\r\t\b\f (fin)",
-				JsonParser.any().from("\"all together: \\\\\\/\\n\\r\\t\\b\\f (fin)\""));
+				JsonParser.any().from("\"all together: \\\\\\/\\n\\r\\t\\b\\f (fin)\"").toString());
 	}
 
 	@Test
 	void stringEscapesAroundBufferBoundary() throws JsonParserException {
 		char[] c = new char[JsonTokener.BUFFER_SIZE - 1024];
-		Arrays.fill(c,  ' ');
+		Arrays.fill(c, ' ');
 		String base = new String(c);
 		for (int i = 0; i < 2048; i++) {
 			base += " ";
-			assertEquals("\u0055", JsonParser.any().from(base + "\"\\u0055\""));
+			assertEquals("\u0055", JsonParser.any().from(base + "\"\\u0055\"").toString());
 		}
 	}
 
 	@Test
 	void stringsAroundBufferBoundary() throws JsonParserException {
 		char[] c = new char[JsonTokener.BUFFER_SIZE - 16];
-		Arrays.fill(c,  ' ');
+		Arrays.fill(c, ' ');
 		String base = new String(c);
 		for (int i = 0; i < 32; i++) {
 			base += " ";
-			assertEquals(base, JsonParser.any().from('"' + base + '"'));
+			assertEquals(base, JsonParser.any().from('"' + base + '"').toString());
 		}
 	}
 
@@ -222,27 +218,28 @@ class JsonParserTest {
 		String[] testCases = new String[] { "0", "1", "-0", "-1", "0.1", "1.1", "-0.1", "0.10", "-0.10", "0e1", "0e0",
 				"-0e-1", "0.0e0", "-0.0e0", "9" };
 		for (String testCase : testCases) {
-			Number n = (Number)JsonParser.any().from(testCase);
+			Number n = (Number) JsonParser.any().from(testCase);
 			assertEquals(Double.parseDouble(testCase), n.doubleValue(), Double.MIN_NORMAL);
-			Number n2 = (Number)JsonParser.any().from(testCase.toUpperCase());
+			Number n2 = (Number) JsonParser.any().from(testCase.toUpperCase());
 			assertEquals(Double.parseDouble(testCase.toUpperCase()), n2.doubleValue(), Double.MIN_NORMAL);
 		}
 	}
 
 	/**
-	 * Test that negative zero ends up as negative zero in both the parser and the writer.
+	 * Test that negative zero ends up as negative zero in both the parser and the
+	 * writer.
 	 */
 	@Test
 	void negativeZero() throws JsonParserException {
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0.0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0.0e0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e1")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-1")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-01")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-000000000001")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0.0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0.0e0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e1")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-1")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-01")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-000000000001")).doubleValue()));
 
 		assertEquals("-0.0", JsonWriter.string(-0.0));
 		assertEquals("-0.0", JsonWriter.string(-0.0f));
@@ -254,15 +251,18 @@ class JsonParserTest {
 	@Test
 	void basicNumbers() throws JsonParserException {
 		for (int i = -100; i <= +100; i++) {
-			assertEquals(i, (int)(Integer)JsonParser.any().from("" + i));
+			Number n = (Number) JsonParser.any().from(Integer.toString(i));
+			assertEquals(i, n.intValue());
 		}
 	}
 
 	@Test
 	void bigint() throws JsonParserException {
 		JsonObject o = JsonParser.object().from("{\"v\":123456789123456789123456789}");
-		BigInteger bigint = (BigInteger)o.get("v");
-		assertEquals("123456789123456789123456789", bigint.toString());
+		Object raw = o.get("v");
+		// May be parsed as JsonLazyNumber or BigInteger depending on laziness settings
+		String s = raw.toString();
+		assertEquals("123456789123456789123456789", s);
 	}
 
 	@Test
@@ -347,7 +347,8 @@ class JsonParserTest {
 	}
 
 	/**
-	 * See http://seriot.ch/json/parsing.html and https://github.com/mmastrac/nanojson/issues/3.
+	 * See http://seriot.ch/json/parsing.html and
+	 * https://github.com/mmastrac/nanojson/issues/3.
 	 */
 	@Test
 	void failNumberEdgeCasesFromJSONSuite() {
@@ -363,7 +364,8 @@ class JsonParserTest {
 	}
 
 	/**
-	 * See http://seriot.ch/json/parsing.html and https://github.com/mmastrac/nanojson/issues/3.
+	 * See http://seriot.ch/json/parsing.html and
+	 * https://github.com/mmastrac/nanojson/issues/3.
 	 */
 	@Test
 	void failNumberEdgeCasesFromJSONSuiteNoArray() {
@@ -712,13 +714,13 @@ class JsonParserTest {
 	@Test
 	void validUTF8Codepoint() throws JsonParserException {
 		assertEquals("\ud83d\ude8a",
-				JsonParser.any().from(new ByteArrayInputStream("\"\ud83d\ude8a\"".getBytes(UTF8))));
+				JsonParser.any().from(new ByteArrayInputStream("\"\ud83d\ude8a\"".getBytes(UTF8))).toString());
 	}
 
 	@Test
 	void validUTF8Codepoint2() throws JsonParserException {
 		assertEquals("\u2602",
-				JsonParser.any().from(new ByteArrayInputStream("\"\u2602\"".getBytes(UTF8))));
+				JsonParser.any().from(new ByteArrayInputStream("\"\u2602\"".getBytes(UTF8))).toString());
 	}
 
 	@Test
@@ -727,7 +729,7 @@ class JsonParserTest {
 		int[] failures = new int[] { 0xc0, 0xc1, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff };
 		for (int i = 0; i < failures.length; i++) {
 			try {
-				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte)failures[i], '"' }));
+				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte) failures[i], '"' }));
 			} catch (JsonParserException e) {
 				testException(e, 1, 2, "UTF-8");
 			}
@@ -736,7 +738,7 @@ class JsonParserTest {
 		// Test the continuation bytes outside of a continuation
 		for (int i = 0x80; i <= 0xBF; i++) {
 			try {
-				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte)i, '"' }));
+				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte) i, '"' }));
 			} catch (JsonParserException e) {
 				testException(e, 1, 2, "UTF-8");
 			}
@@ -744,7 +746,8 @@ class JsonParserTest {
 	}
 
 	/**
-	 * See http://seriot.ch/parsing_json.html and https://github.com/mmastrac/nanojson/issues/3.
+	 * See http://seriot.ch/parsing_json.html and
+	 * https://github.com/mmastrac/nanojson/issues/3.
 	 */
 	@Test
 	void illegalUTF8StringFromJSONSuite() {
@@ -863,7 +866,7 @@ class JsonParserTest {
 
 	/**
 	 * Tests from json.org: http://www.json.org/JSON_checker/
-	 * 
+	 *
 	 * Skips two tests that don't match reality (ie: Chrome).
 	 */
 	@Test
@@ -886,7 +889,7 @@ class JsonParserTest {
 
 			boolean positive = ze.getName().startsWith("test/pass");
 			int offset = 0;
-			int size = (int)ze.getSize();
+			int size = (int) ze.getSize();
 			byte[] buffer = new byte[size];
 			while (size > 0) {
 				int r = zip.read(buffer, offset, buffer.length - offset);
