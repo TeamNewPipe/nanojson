@@ -50,6 +50,7 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 	private int stateIndex = 0;
 	private boolean first = true;
 	private boolean inObject;
+	private String pendingKey;
 
 	/**
 	 * Sequence to use for indenting.
@@ -166,7 +167,9 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 			for (int i = 0; i < length; i++)
 				value(Array.get(o, i));
 			return end();
-		} else
+		} else if (o instanceof JsonConvertible)
+			return value(((JsonConvertible) o).toJsonValue());
+		else
 			throw new JsonWriterException("Unable to handle type: "
 					+ o.getClass());
 	}
@@ -191,7 +194,9 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 			for (int i = 0; i < length; i++)
 				value(Array.get(o, i));
 			return end();
-		} else
+		} else if (o instanceof JsonConvertible)
+			return value(key, ((JsonConvertible) o).toJsonValue());
+		else
 			throw new JsonWriterException("Unable to handle type: "
 					+ o.getClass());
 	}
@@ -243,7 +248,7 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 	@Override
 	public SELF value(Number n) {
 		preValue();
-		if (n == null)
+		if (n == null || nullish(n))
 			raw(NULL);
 		else
 			raw(n.toString());
@@ -372,6 +377,17 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 		return castThis();
 	}
 
+	@Override
+	public SELF key(String key) {
+		if (key == null)
+			throw new NullPointerException("key");
+		if (pendingKey != null)
+			throw new JsonWriterException(
+					"Invalid call to emit a key immediately after emitting a key");
+		pendingKey = key;
+		return castThis();
+	}
+
 	/**
 	 * Ensures that the object is in the finished state.
 	 * 
@@ -472,6 +488,12 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 	}
 
 	private void preValue() {
+		if (pendingKey != null) {
+			String key = pendingKey;
+			pendingKey = null;
+			preValue(key);
+			return;
+		}
 		if (inObject)
 			throw new JsonWriterException(
 					"Invalid call to emit a keyless value while writing an object");
@@ -483,6 +505,9 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 		if (!inObject)
 			throw new JsonWriterException(
 					"Invalid call to emit a key value while not writing an object");
+		if (pendingKey != null)
+			throw new JsonWriterException(
+					"Invalid call to emit a key value immediately after emitting a key");
 
 		pre();
 
@@ -593,5 +618,23 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 	private boolean shouldBeEscaped(char c) {
 		return c < ' ' || (c >= '\u0080' && c < '\u00a0')
 				|| (c >= '\u2000' && c < '\u2100');
+	}
+
+	/**
+	 * Returns true if the number becomes null when converted to JSON. json.org spec does not specify
+	 * NaN or Infinity as numbers, and modern JavaScript engines convert them to null.
+	 * @param n a number
+	 * @return true if the number is nullish.
+	 */
+	private boolean nullish(Number n) {
+		if (n instanceof Double) {
+			Double d = (Double) n;
+			return d.isNaN() || d.isInfinite();
+		}
+        if (n instanceof Float) {
+			Float f = (Float) n;
+			return f.isNaN() || f.isInfinite();
+        }
+        return false;
 	}
 }

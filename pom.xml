@@ -13,19 +13,27 @@
     <artifactId>nanojson</artifactId>
     <packaging>jar</packaging>
     <name>nanojson</name>
-    <version>1.8-SNAPSHOT</version>
+    <version>1.11-SNAPSHOT</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.13.4</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <reporting>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>3.11.3</version>
                 <reportSets>
                     <reportSet>
                         <id>html</id>
@@ -44,7 +52,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>3.6.0</version>
                 <configuration>
                     <configLocation>checkstyle.xml</configLocation>
                     <propertyExpansion>basedir=${basedir}</propertyExpansion>
@@ -66,7 +74,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-report-plugin</artifactId>
-                <version>2.22.2</version>
+                <version>3.5.3</version>
                 <reportSets>
                     <reportSet>
                         <reports>
@@ -77,21 +85,12 @@
             </plugin>
         </plugins>
     </reporting>
-
-    <dependencies>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.13.2</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
     <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.2.1</version>
+                <version>3.3.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -104,7 +103,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>3.11.3</version>
                 <executions>
                     <execution>
                         <id>attach-javadocs</id>
@@ -117,7 +116,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>3.6.0</version>
                 <configuration>
                     <configLocation>checkstyle.xml</configLocation>
                     <propertyExpansion>basedir=${basedir}</propertyExpansion>
@@ -145,7 +144,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>3.0.0</version>
+                <version>3.5.1</version>
 
                 <configuration>
                     <executable>java</executable>
@@ -165,15 +164,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
+                <version>3.14.0</version>
                 <configuration>
                     <debug>true</debug>
                     <debuglevel>none</debuglevel>
-                    <source>1.8</source>
-                    <target>1.8</target>
-                    <archive>
-                        <manifestFile>src/main/resources/META-INF/MANIFEST.MF</manifestFile>
-                    </archive>
+                    <release>8</release>
                     <compilerArgument>-Xlint:all</compilerArgument>
                     <compilerArguments>
                         <Werror />
@@ -183,21 +178,44 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-site-plugin</artifactId>
-                <version>3.9.1</version>
+                <version>3.21.0</version>
                 <configuration>
                 </configuration>
             </plugin>
-	<plugin>
-		<groupId>org.apache.maven.plugins</groupId>
-		<artifactId>maven-jar-plugin</artifactId>
-		<configuration>
-			<archive>
-				<manifestEntries>
-					<Automatic-Module-Name>com.grack.nanojson</Automatic-Module-Name>
-				</manifestEntries>
-			</archive>
-		</configuration>
-	</plugin>
+          <plugin>
+              <groupId>biz.aQute.bnd</groupId>
+              <artifactId>bnd-maven-plugin</artifactId>
+              <extensions>true</extensions>
+              <executions>
+                  <execution>
+                      <id>jar</id>
+                      <goals>
+                          <goal>jar</goal>
+                      </goals>
+                          <configuration>
+                              <bnd><![CDATA[
+                                  Bundle-SymbolicName: ${groupId}.${artifactId}
+                                  Export-Package: com.grack.nanojson
+                                  -jpms-module-info: com.grack.nanojson
+                                  -noextraheaders: 
+                                  -removeheaders: \
+                                    Tool, \
+                                    Bnd-LastModified, \
+                                    Bnd-ManifestVersion, \
+                                    Build-Jdk, \
+                                    Built-By, \
+                                    Created-By, \
+                                    Private-Package, \
+                                    Bundle-DocURL, \
+                                    Bundle-Name, \
+                                    Bundle-Vendor,\
+                                    Bundle-Description,\
+                                    Bundle-SCM
+                              ]]></bnd>
+                          </configuration>
+                  </execution>
+              </executions>
+          </plugin>
         </plugins>
     </build>
 
@@ -210,7 +228,7 @@
                     <plugin>
                         <groupId>org.sonatype.plugins</groupId>
                         <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>1.6.8</version>
+                        <version>1.7.0</version>
                         <extensions>true</extensions>
                         <configuration>
                             <serverId>sonatype-nexus-staging</serverId>
@@ -221,7 +239,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>3.0.1</version>
+                        <version>3.2.8</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
