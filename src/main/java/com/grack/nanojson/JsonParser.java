@@ -188,18 +188,8 @@ public final class JsonParser {
 				JsonObject map = new JsonObject();
 				if (advanceToken() != JsonTokener.TOKEN_OBJECT_END)
 					while (true) {
-						switch (token) {
-						case JsonTokener.TOKEN_NULL:
-						case JsonTokener.TOKEN_TRUE:
-						case JsonTokener.TOKEN_FALSE:
-							value = value.toString();
-							break;
-						case JsonTokener.TOKEN_STRING:
-                        case JsonTokener.TOKEN_SEMI_STRING:
-							break;
-                        default:
+						if (token != JsonTokener.TOKEN_STRING && token != JsonTokener.TOKEN_SEMI_STRING)
 							throw tokener.createParseException(null, "Expected STRING, got " + token, true);
-						}
 						String key = (String)value;
 						if (token == JsonTokener.TOKEN_SEMI_STRING) {
 							if (advanceTokenOld() != JsonTokener.TOKEN_COLON)
@@ -275,18 +265,8 @@ public final class JsonParser {
 			JsonObject map = new JsonObject();
 			if (advanceToken() != JsonTokener.TOKEN_OBJECT_END)
 				while (true) {
-					switch (token) {
-					case JsonTokener.TOKEN_NULL:
-					case JsonTokener.TOKEN_TRUE:
-					case JsonTokener.TOKEN_FALSE:
-						value = value.toString();
-						break;
-					case JsonTokener.TOKEN_STRING:
-					case JsonTokener.TOKEN_SEMI_STRING:
-						break;
-					default:
+					if (token != JsonTokener.TOKEN_STRING && token != JsonTokener.TOKEN_SEMI_STRING)
 						throw tokener.createParseException(null, "Expected STRING, got " + token, true);
-					}
 					String key = (String)value;
 					if (token == JsonTokener.TOKEN_SEMI_STRING) {
 						if (advanceTokenOld() != JsonTokener.TOKEN_COLON)
