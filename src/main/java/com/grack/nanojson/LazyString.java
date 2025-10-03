@@ -101,7 +101,8 @@ public class LazyString implements CharSequence {
             return true;
         if (!(obj instanceof CharSequence))
             return false;
-        if (obj instanceof LazyString other) {
+        if (obj instanceof LazyString) {
+            LazyString other = (LazyString) obj;
             String str = stringValue; // Local ref copy to avoid race
             String otherStr = other.stringValue; // Local ref copy to avoid race
             if (str != null && otherStr != null) {
