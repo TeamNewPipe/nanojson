@@ -361,7 +361,9 @@ final class JsonTokener {
 						// Make sure that there's enough chars for a \\uXXXX escape
 						if (buffer[index] == 'u' && n < MAX_ESCAPE) {
 							index = bufferLength; // Reset index to last valid location
-							throw createParseException(null, "EOF encountered in the middle of a string escape", false);
+							throw createParseException(null,
+									"EOF encountered in the middle of a string escape",
+									false);
 						}
 					}
 					char escape = buffer[index++];
@@ -418,7 +420,9 @@ final class JsonTokener {
 			
 			if (index > bufferLength) {
 				index = bufferLength; // Reset index to last valid location
-				throw createParseException(null, "EOF encountered in the middle of a string escape", false);
+				throw createParseException(null,
+						"EOF encountered in the middle of a string escape",
+						false);
 			}
 		}
 	}
@@ -435,9 +439,8 @@ final class JsonTokener {
 			for (int i = 0; i < n; i++) {
 				char c = stringChar();
 				if (isWhitespace(c) || c == ':') {
-					// Use the index before we fixup
-					reusableBuffer.append(buffer, index - i - 1, i);
 					fixupAfterRawBufferRead();
+					reusableBuffer.append(buffer, index - i - 1, i);
 					return;
 				}
 				if (c == '\\' || (utf8 && (c & 0x80) != 0)) {
@@ -484,17 +487,6 @@ final class JsonTokener {
 				case ',':
 					throw createParseException(null, "Invalid character in semi-string: " + c, false);
 				case '\\':
-					// Ensure that we have at least MAX_ESCAPE here in the buffer
-					if (end - index < MAX_ESCAPE) {
-						// Re-adjust the buffer end, unlikely path
-						n = ensureBuffer(MAX_ESCAPE);
-						end = index + n;
-						// Make sure that there's enough chars for a \\uXXXX escape
-						if (buffer[index] == 'u' && n < MAX_ESCAPE) {
-							index = bufferLength; // Reset index to last valid location
-							throw createParseException(null, "EOF encountered in the middle of a string escape", false);
-						}
-					}
 					char escape = buffer[index++];
 					switch (escape) {
 						case 'b':
@@ -548,7 +540,9 @@ final class JsonTokener {
 
 			if (index > bufferLength) {
 				index = bufferLength; // Reset index to last valid location
-				throw createParseException(null, "EOF encountered in the middle of a string escape", false);
+				throw createParseException(null,
+						"EOF encountered in the middle of a string escape",
+						false);
 			}
 		}
 	}
