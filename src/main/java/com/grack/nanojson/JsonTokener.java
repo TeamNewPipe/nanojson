@@ -831,10 +831,14 @@ final class JsonTokener {
 		case '.':
 			throw createParseException(null, "Numbers may not start with '" + (char)c + "'", true);
 		default:
-			index--;
-			consumeTokenSemiString();
-			token = TOKEN_SEMI_STRING;
-			break;
+			if (isAsciiLetter(c)) {
+				index--;
+				consumeTokenSemiString();
+				token = TOKEN_SEMI_STRING;
+				break;
+			}
+
+			throw createParseException(null, "Unexpected character: " + (char)c, true);
 		}
 		
 //		consumeWhitespace();
