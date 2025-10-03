@@ -485,7 +485,7 @@ final class JsonTokener {
 				case '{':
 				case '}':
 				case ',':
-					throw createParseException(null, "Invalid character in semi-string: " + c, false);
+					throw createParseException(null, "Invalid character in semi-string: \\" + c, false);
 				case '\\':
 					char escape = buffer[index++];
 					switch (escape) {
@@ -780,7 +780,7 @@ final class JsonTokener {
 	 * Consumes a token, first eating up any whitespace ahead of it. Note that number tokens are not necessarily valid
 	 * numbers.
 	 */
-	int advanceToToken(boolean allowSemiString) throws JsonParserException {
+	int advanceToToken() throws JsonParserException {
 		int c = advanceChar();
 		while (isWhitespace(c))
 			c = advanceChar();
@@ -816,11 +816,9 @@ final class JsonTokener {
 				consumeKeyword((char) c, JsonTokener.TRUE);
 				token = TOKEN_TRUE;
 			} catch (JsonParserException e) {
-				if (allowSemiString) {
-					index = oldIndex - 1;
-					consumeTokenSemiString();
-					token = TOKEN_SEMI_STRING;
-				} else throw e;
+				index = oldIndex - 1;
+				consumeTokenSemiString();
+				token = TOKEN_SEMI_STRING;
 			}
 			break;
 		case 'f':
@@ -828,11 +826,9 @@ final class JsonTokener {
 				consumeKeyword((char)c, JsonTokener.FALSE);
 				token = TOKEN_FALSE;
 			} catch (JsonParserException e) {
-				if (allowSemiString) {
-					index = oldIndex - 1;
-					consumeTokenSemiString();
-					token = TOKEN_SEMI_STRING;
-				} else throw e;
+				index = oldIndex - 1;
+				consumeTokenSemiString();
+				token = TOKEN_SEMI_STRING;
 			}
 			break;
 		case 'n':
@@ -840,11 +836,9 @@ final class JsonTokener {
 				consumeKeyword((char)c, JsonTokener.NULL);
 				token = TOKEN_NULL;
 			} catch (JsonParserException e) {
-				if (allowSemiString) {
-					index = oldIndex - 1;
-					consumeTokenSemiString();
-					token = TOKEN_SEMI_STRING;
-				} else throw e;
+				index = oldIndex - 1;
+				consumeTokenSemiString();
+				token = TOKEN_SEMI_STRING;
 			}
 			break;
 		case '"':
@@ -870,17 +864,10 @@ final class JsonTokener {
 		case '.':
 			throw createParseException(null, "Numbers may not start with '" + (char)c + "'", true);
 		default:
-			if (allowSemiString) {
-				index--;
-				consumeTokenSemiString();
-				token = TOKEN_SEMI_STRING;
-				break;
-			} else {
-				if (isAsciiLetter(c))
-					throw createHelpfulException((char)c, null, 0);
-
-				throw createParseException(null, "Unexpected character: " + (char)c, true);
-			}
+			index--;
+			consumeTokenSemiString();
+			token = TOKEN_SEMI_STRING;
+			break;
 		}
 		
 //		consumeWhitespace();
