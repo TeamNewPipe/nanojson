@@ -291,8 +291,10 @@ public final class JsonParser {
 					if (token == JsonTokener.TOKEN_SEMI_STRING) {
 						if (advanceTokenOld() != JsonTokener.TOKEN_COLON)
 							throw tokener.createParseException(null, "Expected COLON, got " + token, true);
-					} else if (advanceToken() != JsonTokener.TOKEN_COLON)
-						throw tokener.createParseException(null, "Expected COLON, got " + token, true);
+					} else {
+						if (advanceToken() != JsonTokener.TOKEN_COLON)
+							throw tokener.createParseException(null, "Expected COLON, got " + token, true);
+					}
 					advanceToken();
 					map.put(key, currentValue());
 					if (advanceToken() == JsonTokener.TOKEN_OBJECT_END)
@@ -315,6 +317,8 @@ public final class JsonParser {
 			value = null;
 			break;
 		case JsonTokener.TOKEN_STRING:
+			value = tokener.reusableBuffer.toString();
+			break;
 		case JsonTokener.TOKEN_SEMI_STRING:
 			value = tokener.reusableBuffer.toString();
 			break;
