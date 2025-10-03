@@ -284,7 +284,7 @@ final class JsonTokener {
 	/**
 	 * Steps through to the end of the current string token (the unescaped double quote).
 	 */
-	void consumeTokenString(int cc) throws JsonParserException {
+	void consumeTokenString() throws JsonParserException {
 		reusableBuffer.setLength(0);
 		
 		// Assume no escapes or UTF-8 in the string to start (fast path)
@@ -296,7 +296,7 @@ final class JsonTokener {
 			
 			for (int i = 0; i < n; i++) {
 				char c = stringChar();
-				if (c == cc) {
+				if (c == '"') {
 					// Use the index before we fixup
 					reusableBuffer.append(buffer, index - i - 1, i);
 					fixupAfterRawBufferRead();
@@ -328,15 +328,9 @@ final class JsonTokener {
 				}
 	
 				switch (c) {
-				case '"':
-				case '\'':
-					if (c == cc) {
-						fixupAfterRawBufferRead();
-						return;
-					} else {
-						reusableBuffer.append(c);
-						break;
-					}
+				case '\"':
+					fixupAfterRawBufferRead();
+					return;
 				case '\\':
 					// Ensure that we have at least MAX_ESCAPE here in the buffer
 					if (end - index < MAX_ESCAPE) {
@@ -369,7 +363,6 @@ final class JsonTokener {
 						reusableBuffer.append('\t');
 						break;
 					case '"':
-					case '\'':
 					case '/':
 					case '\\':
 						reusableBuffer.append(escape);
@@ -816,9 +809,8 @@ final class JsonTokener {
 				token = TOKEN_SEMI_STRING;
 			}
 			break;
-		case '"':
-		case '\'':
-			consumeTokenString(c);
+		case '\"':
+			consumeTokenString();
 			token = TOKEN_STRING;
 			break;
 		case '-':
