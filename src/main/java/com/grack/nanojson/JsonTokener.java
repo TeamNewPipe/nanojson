@@ -401,7 +401,8 @@ final class JsonTokener implements Closeable {
 									} else if (digit >= 'a' && digit <= 'f') {
 										escaped |= (digit - 'a') + 10;
 									} else {
-										throw createParseException(null, "Expected unicode hex escape character: "
+										throw createParseException(null,
+												"Expected unicode hex escape character: "
 												+ (char) digit + " (" + digit + ")", false);
 									}
 								}

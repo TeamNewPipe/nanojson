@@ -604,8 +604,8 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 								}
 								char lowSurrogate = s.charAt(i + 1);
 								if (!Character.isLowSurrogate(lowSurrogate)) {
-									throw new JsonWriterException(
-											"Invalid surrogate pair: high surrogate not followed by low surrogate");
+									throw new JsonWriterException("Invalid surrogate pair: "
+											+ "high surrogate not followed by low surrogate");
 								}
 								// Need 4 bytes for any supplementary code point in UTF-8. Flush first if
 								// insufficient space
@@ -626,7 +626,8 @@ class JsonWriterBase<SELF extends JsonWriterBase<SELF>> implements
 											"Unable to encode character 0x" + Integer.toHexString(fc));
 								}
 							} else if (Character.isLowSurrogate(c)) {
-								throw new JsonWriterException("Invalid low surrogate without preceding high surrogate");
+								throw new JsonWriterException(
+										"Invalid low surrogate without preceding high surrogate");
 							} else {
 								bb[bo++] = (byte) (0xe0 | c >> 12);
 								bb[bo++] = (byte) (0x80 | (c >> 6) & 0x3f);

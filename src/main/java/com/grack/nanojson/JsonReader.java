@@ -37,7 +37,9 @@ public final class JsonReader implements Closeable {
 	private int stateIndex = 0;
 	private boolean inObject;
 	private boolean first = true;
+	// CHECKSTYLE_OFF: MagicNumber
 	private CharBuffer key = CharBufferPool.get(1024);
+	// CHECKSTYLE_ON: MagicNumber
 
 	/**
 	 * The type of value that the {@link JsonReader} is positioned over.
