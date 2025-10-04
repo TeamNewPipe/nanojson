@@ -1,12 +1,12 @@
 /*
  * Copyright 2011 The nanojson Authors
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -15,29 +15,28 @@
  */
 package com.grack.nanojson;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for {@link JsonParser}.
  */
-public class JsonParserTest {
+class JsonParserTest {
 	private static final Charset UTF8;
 
 	static {
@@ -48,88 +47,85 @@ public class JsonParserTest {
 	// CHECKSTYLE_OFF: JavadocMethod
 	// CHECKSTYLE_OFF: EmptyBlock
 	@Test
-	public void testWhitespace() throws JsonParserException {
+	void whitespace() throws JsonParserException {
 		assertEquals(JsonObject.class,
 				JsonParser.object().from(" \t\r\n  { \t\r\n \"abc\"   \t\r\n : \t\r\n  1 \t\r\n  }  \t\r\n   ")
 						.getClass());
 		assertEquals("{}", JsonParser.object().from("{}").toString());
 	}
-	
+
 	@Test
-	public void testWhitespaceSimpler() throws JsonParserException {
+	void whitespaceSimpler() throws JsonParserException {
 		assertEquals(JsonObject.class,
 				JsonParser.object().from(" {} ")
 						.getClass());
 	}
 
-
 	@Test
-	public void testWriterOutput() throws JsonParserException {
+	void writerOutput() throws JsonParserException {
 		//@formatter:off
 		String json = JsonWriter.string()
-				.object()
-					.object("a")
-						.array("b")
-							.object()
-								.value("a", 1)
-								.value("b", 2)
-							.end()
-							.object()
-								.value("c", 1.0)
-								.value("d", 2.0)
-							.end()
+			.object()
+				.object("a")
+					.array("b")
+						.object()
+							.value("a", 1)
+							.value("b", 2)
 						.end()
-						.value("c", JsonArray.from("v0", "v1", "v2"))
+						.object()
+							.value("c", 1.0)
+							.value("d", 2.0)
+						.end()
 					.end()
+					.value("c", JsonArray.from("v0", "v1", "v2"))
 				.end()
-			.done();
+			.end()
+		.done();
 		//@formatter:on
-		
-		// Just make sure it can be read - don't validate
-		JsonParser.object().from(json);
+		JsonParser.object().from(json); // ensure parseable
 	}
-	
+
 	@Test
-	public void testEmptyObject() throws JsonParserException {
+	void emptyObject() throws JsonParserException {
 		assertEquals(JsonObject.class, JsonParser.object().from("{}").getClass());
 		assertEquals("{}", JsonParser.object().from("{}").toString());
 	}
 
 	@Test
-	public void testObjectOneElement() throws JsonParserException {
+	void objectOneElement() throws JsonParserException {
 		assertEquals(JsonObject.class, JsonParser.object().from("{\"a\":1}").getClass());
 		assertEquals("{a=1}", JsonParser.object().from("{\"a\":1}").toString());
 	}
 
 	@Test
-	public void testObjectTwoElements() throws JsonParserException {
+	void objectTwoElements() throws JsonParserException {
 		JsonObject obj = JsonParser.object().from("{\"a\":1,\"B\":1}");
 		assertEquals(JsonObject.class, obj.getClass());
-		assertEquals(1, obj.get("B"));
-		assertEquals(1, obj.get("a"));
+		assertEquals(1, obj.getInt("B"));
+		assertEquals(1, obj.getInt("a"));
 		assertEquals(2, obj.size());
 	}
 
 	@Test
-	public void testEmptyArray() throws JsonParserException {
+	void emptyArray() throws JsonParserException {
 		assertEquals(JsonArray.class, JsonParser.array().from("[]").getClass());
 		assertEquals("[]", JsonParser.array().from("[]").toString());
 	}
 
 	@Test
-	public void testArrayOneElement() throws JsonParserException {
+	void arrayOneElement() throws JsonParserException {
 		assertEquals(JsonArray.class, JsonParser.array().from("[1]").getClass());
 		assertEquals("[1]", JsonParser.array().from("[1]").toString());
 	}
 
 	@Test
-	public void testArrayTwoElements() throws JsonParserException {
+	void arrayTwoElements() throws JsonParserException {
 		assertEquals(JsonArray.class, JsonParser.array().from("[1,1]").getClass());
 		assertEquals("[1, 1]", JsonParser.array().from("[1,1]").toString());
 	}
 
 	@Test
-	public void testBasicTypes() throws JsonParserException {
+	void basicTypes() throws JsonParserException {
 		assertEquals("true", JsonParser.any().from("true").toString());
 		assertEquals("false", JsonParser.any().from("false").toString());
 		assertNull(JsonParser.any().from("null"));
@@ -140,9 +136,9 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testArrayWithEverything() throws JsonParserException {
+	void arrayWithEverything() throws JsonParserException {
 		JsonArray a = JsonParser.array().from("[1, -1.0e6, \"abc\", [1,2,3], {\"abc\":123}, true, false]");
-		assertEquals("[1, -1000000.0, abc, [1, 2, 3], {abc=123}, true, false]", a.toString());
+		assertEquals("[1, -1.0e6, abc, [1, 2, 3], {abc=123}, true, false]", a.toString());
 		assertEquals(1.0, a.getDouble(0), 0.001f);
 		assertEquals(1, a.getInt(0));
 		assertEquals(-1000000, a.getInt(1));
@@ -155,94 +151,95 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testObjectWithEverything() throws JsonParserException {
+	void objectWithEverything() throws JsonParserException {
 		// TODO: Is this deterministic if we use string keys?
 		JsonObject o = JsonParser.object().from(
 				"{\"abc\":123, \"def\":456.0, \"ghi\":[true, false], \"jkl\":null, \"mno\":true}");
 
-		assertEquals(null, o.get("jkl"));
+		assertNull(o.get("jkl"));
 		assertTrue(o.containsKey("jkl"));
-		assertEquals(123, o.get("abc"));
+		assertEquals(123, ((Number) o.get("abc")).intValue());
 		assertEquals(Arrays.asList(true, false), o.get("ghi"));
-		assertEquals(456.0, o.get("def"));
+		assertEquals(456.0, ((Number) o.get("def")).doubleValue());
 		assertEquals(true, o.get("mno"));
 		assertEquals(5, o.size());
 
 		assertEquals(123, o.getInt("abc"));
 		assertEquals(456, o.getInt("def"));
-		assertEquals(true, o.getArray("ghi").getBoolean(0));
-		assertEquals(null, o.get("jkl"));
+		assertTrue(o.getArray("ghi").getBoolean(0));
+		assertNull(o.get("jkl"));
 		assertTrue(o.isNull("jkl"));
 		assertTrue(o.getBoolean("mno"));
 	}
 
 	@Test
-	public void testStringEscapes() throws JsonParserException {
-		assertEquals("\n", JsonParser.any().from("\"\\n\""));
-		assertEquals("\r", JsonParser.any().from("\"\\r\""));
-		assertEquals("\t", JsonParser.any().from("\"\\t\""));
-		assertEquals("\b", JsonParser.any().from("\"\\b\""));
-		assertEquals("\f", JsonParser.any().from("\"\\f\""));
-		assertEquals("/", JsonParser.any().from("\"/\""));
-		assertEquals("\\", JsonParser.any().from("\"\\\\\""));
-		assertEquals("\"", JsonParser.any().from("\"\\\"\""));
-		assertEquals("\0", JsonParser.any().from("\"\\u0000\""));
-		assertEquals("\u8000", JsonParser.any().from("\"\\u8000\""));
-		assertEquals("\uffff", JsonParser.any().from("\"\\uffff\""));
-		assertEquals("\uFFFF", JsonParser.any().from("\"\\uFFFF\""));
+	void stringEscapes() throws JsonParserException {
+		assertEquals("\n", JsonParser.any().from("\"\\n\"").toString());
+		assertEquals("\r", JsonParser.any().from("\"\\r\"").toString());
+		assertEquals("\t", JsonParser.any().from("\"\\t\"").toString());
+		assertEquals("\b", JsonParser.any().from("\"\\b\"").toString());
+		assertEquals("\f", JsonParser.any().from("\"\\f\"").toString());
+		assertEquals("/", JsonParser.any().from("\"/\"").toString());
+		assertEquals("\\", JsonParser.any().from("\"\\\\\"").toString());
+		assertEquals("\"", JsonParser.any().from("\"\\\"\"").toString());
+		assertEquals("\0", JsonParser.any().from("\"\\u0000\"").toString());
+		assertEquals("\u8000", JsonParser.any().from("\"\\u8000\"").toString());
+		assertEquals("\uffff", JsonParser.any().from("\"\\uffff\"").toString());
+		assertEquals("\uFFFF", JsonParser.any().from("\"\\uFFFF\"").toString());
 
 		assertEquals("all together: \\/\n\r\t\b\f (fin)",
-				JsonParser.any().from("\"all together: \\\\\\/\\n\\r\\t\\b\\f (fin)\""));
+				JsonParser.any().from("\"all together: \\\\\\/\\n\\r\\t\\b\\f (fin)\"").toString());
 	}
 
 	@Test
-	public void testStringEscapesAroundBufferBoundary() throws JsonParserException {
+	void stringEscapesAroundBufferBoundary() throws JsonParserException {
 		char[] c = new char[JsonTokener.BUFFER_SIZE - 1024];
-		Arrays.fill(c,  ' ');
+		Arrays.fill(c, ' ');
 		String base = new String(c);
 		for (int i = 0; i < 2048; i++) {
 			base += " ";
-			assertEquals("\u0055", JsonParser.any().from(base + "\"\\u0055\""));
+			assertEquals("\u0055", JsonParser.any().from(base + "\"\\u0055\"").toString());
 		}
 	}
 
 	@Test
-	public void testStringsAroundBufferBoundary() throws JsonParserException {
+	void stringsAroundBufferBoundary() throws JsonParserException {
 		char[] c = new char[JsonTokener.BUFFER_SIZE - 16];
-		Arrays.fill(c,  ' ');
+		Arrays.fill(c, ' ');
 		String base = new String(c);
 		for (int i = 0; i < 32; i++) {
 			base += " ";
-			assertEquals(base, JsonParser.any().from('"' + base + '"'));
+			assertEquals(base, JsonParser.any().from('"' + base + '"').toString());
 		}
 	}
 
 	@Test
-	public void testNumbers() throws JsonParserException {
+	void numbers() throws JsonParserException {
 		String[] testCases = new String[] { "0", "1", "-0", "-1", "0.1", "1.1", "-0.1", "0.10", "-0.10", "0e1", "0e0",
 				"-0e-1", "0.0e0", "-0.0e0", "9" };
 		for (String testCase : testCases) {
-			Number n = (Number)JsonParser.any().from(testCase);
+			Number n = (Number) JsonParser.any().from(testCase);
 			assertEquals(Double.parseDouble(testCase), n.doubleValue(), Double.MIN_NORMAL);
-			Number n2 = (Number)JsonParser.any().from(testCase.toUpperCase());
+			Number n2 = (Number) JsonParser.any().from(testCase.toUpperCase());
 			assertEquals(Double.parseDouble(testCase.toUpperCase()), n2.doubleValue(), Double.MIN_NORMAL);
 		}
 	}
 
 	/**
-	 * Test that negative zero ends up as negative zero in both the parser and the writer.
+	 * Test that negative zero ends up as negative zero in both the parser and the
+	 * writer.
 	 */
 	@Test
-	public void testNegativeZero() throws JsonParserException {
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0.0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0.0e0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e1")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-1")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-0")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-01")).doubleValue()));
-		assertEquals("-0.0", Double.toString(((Number)JsonParser.any().from("-0e-000000000001")).doubleValue()));
+	void negativeZero() throws JsonParserException {
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0.0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0.0e0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e1")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-1")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-0")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-01")).doubleValue()));
+		assertEquals("-0.0", Double.toString(((Number) JsonParser.any().from("-0e-000000000001")).doubleValue()));
 
 		assertEquals("-0.0", JsonWriter.string(-0.0));
 		assertEquals("-0.0", JsonWriter.string(-0.0f));
@@ -252,21 +249,24 @@ public class JsonParserTest {
 	 * Test the basic numbers from -100 to 100 as a sanity check.
 	 */
 	@Test
-	public void testBasicNumbers() throws JsonParserException {
+	void basicNumbers() throws JsonParserException {
 		for (int i = -100; i <= +100; i++) {
-			assertEquals(i, (int)(Integer)JsonParser.any().from("" + i));
+			Number n = (Number) JsonParser.any().from(Integer.toString(i));
+			assertEquals(i, n.intValue());
 		}
 	}
 
 	@Test
-	public void testBigint() throws JsonParserException {
+	void bigint() throws JsonParserException {
 		JsonObject o = JsonParser.object().from("{\"v\":123456789123456789123456789}");
-		BigInteger bigint = (BigInteger)o.get("v");
-		assertEquals("123456789123456789123456789", bigint.toString());
+		Object raw = o.get("v");
+		// May be parsed as JsonLazyNumber or BigInteger depending on laziness settings
+		String s = raw.toString();
+		assertEquals("123456789123456789123456789", s);
 	}
 
 	@Test
-	public void testFailWrongType() {
+	void failWrongType() {
 		try {
 			JsonParser.object().from("1");
 			fail("Should have failed to parse");
@@ -276,7 +276,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailNull() {
+	void failNull() {
 		try {
 			JsonParser.object().from("null");
 			fail("Should have failed to parse");
@@ -286,7 +286,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailNoJson1() {
+	void failNoJson1() {
 		try {
 			JsonParser.object().from("");
 			fail("Should have failed to parse");
@@ -296,7 +296,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailNoJson2() {
+	void failNoJson2() {
 		try {
 			JsonParser.object().from(" ");
 			fail("Should have failed to parse");
@@ -306,7 +306,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailNoJson3() {
+	void failNoJson3() {
 		try {
 			JsonParser.object().from("  ");
 			fail("Should have failed to parse");
@@ -316,7 +316,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailNumberEdgeCases() {
+	void failNumberEdgeCases() {
 		String[] edgeCases = { "-", ".", "e", "01", "-01", "+01", "01.1", "-01.1", "+01.1", ".1", "-.1", "+.1", "+1",
 				"0.", "-0.", "+0.", "0.e", "-0.e", "+0.e", "0e", "-0e", "+0e", "0e-", "-0e-", "+0e-", "0e+", "-0e+",
 				"+0e+", "-e", "+e", "2.", "-2.", "-1.e1", "1.e1", "0.e1" };
@@ -347,10 +347,11 @@ public class JsonParserTest {
 	}
 
 	/**
-	 * See http://seriot.ch/json/parsing.html and https://github.com/mmastrac/nanojson/issues/3.
+	 * See http://seriot.ch/json/parsing.html and
+	 * https://github.com/mmastrac/nanojson/issues/3.
 	 */
 	@Test
-	public void testFailNumberEdgeCasesFromJSONSuite() {
+	void failNumberEdgeCasesFromJSONSuite() {
 		String[] edgeCases = { "[-2.]", "[0.e1]", "[2.e+3]", "[2.e-3]", "[2.e3]", "[1.]" };
 		for (String edgeCase : edgeCases) {
 			try {
@@ -363,10 +364,11 @@ public class JsonParserTest {
 	}
 
 	/**
-	 * See http://seriot.ch/json/parsing.html and https://github.com/mmastrac/nanojson/issues/3.
+	 * See http://seriot.ch/json/parsing.html and
+	 * https://github.com/mmastrac/nanojson/issues/3.
 	 */
 	@Test
-	public void testFailNumberEdgeCasesFromJSONSuiteNoArray() {
+	void failNumberEdgeCasesFromJSONSuiteNoArray() {
 		String[] edgeCases = { "-2.", "0.e1", "2.e+3", "2.e-3", "2.e3", "1." };
 		for (String edgeCase : edgeCases) {
 			try {
@@ -379,7 +381,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedNumber1() {
+	void failBustedNumber1() {
 		try {
 			// There's no 'f' in double, but it treats it as a new token
 			JsonParser.object().from("123f");
@@ -390,7 +392,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedNumber2() {
+	void failBustedNumber2() {
 		try {
 			// Badly formed number
 			JsonParser.object().from("-1-1");
@@ -401,7 +403,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedString1() {
+	void failBustedString1() {
 		try {
 			// Missing " at end
 			JsonParser.object().from("\"abc");
@@ -412,7 +414,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedString2() {
+	void failBustedString2() {
 		try {
 			// \n in middle of string
 			JsonParser.object().from("\"abc\n\"");
@@ -423,7 +425,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedString3() {
+	void failBustedString3() {
 		try {
 			// Bad escape "\x" in middle of string
 			JsonParser.object().from("\"abc\\x\"");
@@ -434,7 +436,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedString4() {
+	void failBustedString4() {
 		try {
 			// Bad escape "\\u123x" in middle of string
 			JsonParser.object().from("\"\\u123x\"");
@@ -445,7 +447,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedString5() {
+	void failBustedString5() {
 		try {
 			// Incomplete unicode escape
 			JsonParser.object().from("\"\\u222\"");
@@ -456,7 +458,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedString6() {
+	void failBustedString6() {
 		try {
 			// String that terminates halfway through a unicode escape
 			JsonParser.object().from("\"\\u222");
@@ -467,7 +469,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBustedString7() {
+	void failBustedString7() {
 		try {
 			// String that terminates halfway through a regular escape
 			JsonParser.object().from("\"\\");
@@ -478,7 +480,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailArrayTrailingComma1() {
+	void failArrayTrailingComma1() {
 		try {
 			JsonParser.object().from("[,]");
 			fail();
@@ -488,7 +490,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailArrayTrailingComma2() {
+	void failArrayTrailingComma2() {
 		try {
 			JsonParser.object().from("[1,]");
 			fail();
@@ -498,7 +500,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailObjectTrailingComma1() {
+	void failObjectTrailingComma1() {
 		try {
 			JsonParser.object().from("{,}");
 			fail();
@@ -508,7 +510,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailObjectTrailingComma2() {
+	void failObjectTrailingComma2() {
 		try {
 			JsonParser.object().from("{\"abc\":123,}");
 			fail();
@@ -518,7 +520,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailObjectBadKey1() {
+	void failObjectBadKey1() {
 		try {
 			JsonParser.object().from("{true:1}");
 			fail();
@@ -528,7 +530,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailObjectBadKey2() {
+	void failObjectBadKey2() {
 		try {
 			JsonParser.object().from("{2:1}");
 			fail();
@@ -538,7 +540,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailObjectBadColon1() {
+	void failObjectBadColon1() {
 		try {
 			JsonParser.object().from("{\"abc\":}");
 			fail();
@@ -548,7 +550,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailObjectBadColon2() {
+	void failObjectBadColon2() {
 		try {
 			JsonParser.object().from("{\"abc\":1:}");
 			fail();
@@ -558,7 +560,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailObjectBadColon3() {
+	void failObjectBadColon3() {
 		try {
 			JsonParser.object().from("{:\"abc\":1}");
 			fail();
@@ -568,7 +570,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBadKeywords1() {
+	void failBadKeywords1() {
 		try {
 			JsonParser.object().from("truef");
 			fail();
@@ -578,7 +580,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBadKeywords2() {
+	void failBadKeywords2() {
 		try {
 			JsonParser.object().from("true1");
 			fail();
@@ -588,7 +590,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBadKeywords3() {
+	void failBadKeywords3() {
 		try {
 			JsonParser.object().from("tru");
 			fail();
@@ -598,7 +600,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBadKeywords4() {
+	void failBadKeywords4() {
 		try {
 			JsonParser.object().from("[truef,true]");
 			fail();
@@ -608,7 +610,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBadKeywords5() {
+	void failBadKeywords5() {
 		try {
 			JsonParser.object().from("grue");
 			fail();
@@ -618,7 +620,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBadKeywords6() {
+	void failBadKeywords6() {
 		try {
 			JsonParser.object().from("trueeeeeeeeeeeeeeeeeeee");
 			fail();
@@ -628,7 +630,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailBadKeywords7() {
+	void failBadKeywords7() {
 		try {
 			JsonParser.object().from("g");
 			fail();
@@ -638,7 +640,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailTrailingCommaMultiline() {
+	void failTrailingCommaMultiline() {
 		String testString = "{\n\"abc\":123,\n\"def\":456,\n}";
 		try {
 			JsonParser.object().from(testString);
@@ -652,7 +654,7 @@ public class JsonParserTest {
 	 * Ensures that we're correctly tracking UTF-8 character positions.
 	 */
 	@Test
-	public void testFailTrailingCommaUTF8() {
+	void failTrailingCommaUTF8() {
 		ByteArrayInputStream in1 = new ByteArrayInputStream("{\n\"abc\":123,\"def\":456,}".getBytes(Charset
 				.forName("UTF-8")));
 		ByteArrayInputStream in2 = new ByteArrayInputStream(
@@ -676,58 +678,58 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testEncodingUTF8() throws JsonParserException {
+	void encodingUTF8() throws JsonParserException {
 		testEncoding(UTF8);
 		testEncodingBOM(UTF8);
 	}
 
 	@Test
-	public void testEncodingUTF16LE() throws JsonParserException {
+	void encodingUTF16LE() throws JsonParserException {
 		Charset charset = Charset.forName("UTF-16LE");
 		testEncoding(charset);
 		testEncodingBOM(charset);
 	}
 
 	@Test
-	public void testEncodingUTF16BE() throws JsonParserException {
+	void encodingUTF16BE() throws JsonParserException {
 		Charset charset = Charset.forName("UTF-16BE");
 		testEncoding(charset);
 		testEncodingBOM(charset);
 	}
 
 	@Test
-	public void testEncodingUTF32LE() throws JsonParserException {
+	void encodingUTF32LE() throws JsonParserException {
 		Charset charset = Charset.forName("UTF-32LE");
 		testEncoding(charset);
 		testEncodingBOM(charset);
 	}
 
 	@Test
-	public void testEncodingUTF32BE() throws JsonParserException {
+	void encodingUTF32BE() throws JsonParserException {
 		Charset charset = Charset.forName("UTF-32BE");
 		testEncoding(charset);
 		testEncodingBOM(charset);
 	}
 
 	@Test
-	public void testValidUTF8Codepoint() throws JsonParserException {
+	void validUTF8Codepoint() throws JsonParserException {
 		assertEquals("\ud83d\ude8a",
-				JsonParser.any().from(new ByteArrayInputStream("\"\ud83d\ude8a\"".getBytes(UTF8))));
+				JsonParser.any().from(new ByteArrayInputStream("\"\ud83d\ude8a\"".getBytes(UTF8))).toString());
 	}
 
 	@Test
-	public void testValidUTF8Codepoint2() throws JsonParserException {
+	void validUTF8Codepoint2() throws JsonParserException {
 		assertEquals("\u2602",
-				JsonParser.any().from(new ByteArrayInputStream("\"\u2602\"".getBytes(UTF8))));
+				JsonParser.any().from(new ByteArrayInputStream("\"\u2602\"".getBytes(UTF8))).toString());
 	}
 
 	@Test
-	public void testIllegalUTF8Bytes() {
+	void illegalUTF8Bytes() {
 		// Test the always-illegal bytes
 		int[] failures = new int[] { 0xc0, 0xc1, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff };
 		for (int i = 0; i < failures.length; i++) {
 			try {
-				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte)failures[i], '"' }));
+				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte) failures[i], '"' }));
 			} catch (JsonParserException e) {
 				testException(e, 1, 2, "UTF-8");
 			}
@@ -736,7 +738,7 @@ public class JsonParserTest {
 		// Test the continuation bytes outside of a continuation
 		for (int i = 0x80; i <= 0xBF; i++) {
 			try {
-				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte)i, '"' }));
+				JsonParser.object().from(new ByteArrayInputStream(new byte[] { '"', (byte) i, '"' }));
 			} catch (JsonParserException e) {
 				testException(e, 1, 2, "UTF-8");
 			}
@@ -744,10 +746,11 @@ public class JsonParserTest {
 	}
 
 	/**
-	 * See http://seriot.ch/parsing_json.html and https://github.com/mmastrac/nanojson/issues/3.
+	 * See http://seriot.ch/parsing_json.html and
+	 * https://github.com/mmastrac/nanojson/issues/3.
 	 */
 	@Test
-	public void testIllegalUTF8StringFromJSONSuite() {
+	void illegalUTF8StringFromJSONSuite() {
 		try {
 			JsonParser.object().from(new ByteArrayInputStream(new byte[] {
 					'"', (byte) 0xed, (byte) 0xa0, (byte) 0x80, '"' }));
@@ -774,7 +777,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void failureTestsFromYui() throws IOException {
+	void failureTestsFromYui() throws IOException {
 		InputStream input = getClass().getClassLoader().getResourceAsStream("yui_fail_cases.txt");
 
 		String[] failCases = readAsUtf8(input).split("\n");
@@ -789,7 +792,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void tortureTest() throws JsonParserException, IOException {
+	void tortureTest() throws JsonParserException, IOException {
 		InputStream input = getClass().getClassLoader().getResourceAsStream("sample.json");
 		JsonObject o = JsonParser.object().from(readAsUtf8(input));
 		assertNotNull(o.get("a"));
@@ -803,26 +806,26 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void tortureTestUrl() throws JsonParserException {
+	void tortureTestUrl() throws JsonParserException {
 		JsonObject o = JsonParser.object().from(getClass().getClassLoader().getResource("sample.json"));
 		assertNotNull(o.getObject("a").getArray("b\uecee\u8324\u007a\\\ue768.N"));
 	}
 
 	@Test
-	public void tortureTestStream() throws JsonParserException {
+	void tortureTestStream() throws JsonParserException {
 		JsonObject o = JsonParser.object().from(getClass().getClassLoader().getResourceAsStream("sample.json"));
 		assertNotNull(o.getObject("a").getArray("b\uecee\u8324\u007a\\\ue768.N"));
 	}
 
 	@Test
-	public void testIssue38() throws JsonParserException, IOException {
+	void issue38() throws JsonParserException, IOException {
 		// https://github.com/mmastrac/nanojson/issues/38
 		InputStream input = getClass().getClassLoader().getResourceAsStream("issue-38.json");
 		JsonParser.any().from(readAsUtf8(input));
 	}
 
 	@Test
-	public void testEscapeSequencesAcrossBufferBoundary() throws JsonParserException {
+	void escapeSequencesAcrossBufferBoundary() throws JsonParserException {
 		String s1 = "";
 		String s2 = "";
 
@@ -839,7 +842,7 @@ public class JsonParserTest {
 	}
 
 	@Test
-	public void testFailTruncatedEscapeAcrossBufferBoundary() {
+	void failTruncatedEscapeAcrossBufferBoundary() {
 		String s1 = "\\u123";
 		String s2 = "";
 		for (int i = 0; i < 126; i++) {
@@ -856,18 +859,18 @@ public class JsonParserTest {
 				JsonParser.object().from("\"" + s2 + s1);
 				fail();
 			} catch (JsonParserException e) {
-				assertTrue(e.getMessage(), e.getMessage().contains("EOF"));
+				assertTrue(e.getMessage().contains("EOF"), e.getMessage());
 			}
 		}
 	}
 
 	/**
 	 * Tests from json.org: http://www.json.org/JSON_checker/
-	 * 
+	 *
 	 * Skips two tests that don't match reality (ie: Chrome).
 	 */
 	@Test
-	public void jsonOrgTest() throws IOException {
+	void jsonOrgTest() throws IOException {
 		InputStream input = getClass().getClassLoader().getResourceAsStream("json_org_test.zip");
 		ZipInputStream zip = new ZipInputStream(input);
 		ZipEntry ze;
@@ -886,7 +889,7 @@ public class JsonParserTest {
 
 			boolean positive = ze.getName().startsWith("test/pass");
 			int offset = 0;
-			int size = (int)ze.getSize();
+			int size = (int) ze.getSize();
 			byte[] buffer = new byte[size];
 			while (size > 0) {
 				int r = zip.read(buffer, offset, buffer.length - offset);
@@ -931,14 +934,14 @@ public class JsonParserTest {
 	}
 
 	private void testException(JsonParserException e, int linePos, int charPos) {
-		assertEquals(e.getMessage() + " incorrect location",
-				"line " + linePos + " char " + charPos,
-				"line " + e.getLinePosition() + " char " + e.getCharPosition());
+		assertEquals("line " + linePos + " char " + charPos,
+				"line " + e.getLinePosition() + " char " + e.getCharPosition(),
+				e.getMessage() + " incorrect location");
 	}
 
 	private void testException(JsonParserException e, int linePos, int charPos, String inError) {
 		assertEquals("line " + linePos + " char " + charPos,
 				"line " + e.getLinePosition() + " char " + e.getCharPosition());
-		assertTrue("Error did not contain '" + inError + "': " + e.getMessage(), e.getMessage().contains(inError));
+		assertTrue(e.getMessage().contains(inError), "Error did not contain '" + inError + "': " + e.getMessage());
 	}
 }

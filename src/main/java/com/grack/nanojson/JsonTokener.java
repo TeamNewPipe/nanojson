@@ -17,19 +17,24 @@ package com.grack.nanojson;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Internal class for tokenizing JSON. Used by both {@link JsonParser} and {@link JsonReader}.
+ * Internal class for tokenizing JSON. Used by both {@link JsonParser} and
+ * {@link JsonReader}.
  */
-final class JsonTokener {
+final class JsonTokener implements Closeable {
 	// Used by tests
 	static final int BUFFER_SIZE = 32 * 1024;
+
+	static final int MAX_CHAR_BUFFER_SIZE = 512;
 
 	static final int BUFFER_ROOM = 256;
 	static final int MAX_ESCAPE = 5; // uXXXX (don't need the leading slash)
@@ -38,14 +43,14 @@ final class JsonTokener {
 	private int tokenCharPos, tokenCharOffset;
 
 	private boolean eof;
-	protected int index;
+	private int index;
 	private final Reader reader;
 	private final char[] buffer = new char[BUFFER_SIZE];
 	private int bufferLength;
 
 	private final boolean utf8;
 
-	protected StringBuilder reusableBuffer = new StringBuilder();
+	protected CharBuffer reusableBuffer = CharBufferPool.get(MAX_CHAR_BUFFER_SIZE);
 	protected boolean isDouble;
 
 	static final char[] TRUE = { 'r', 'u', 'e' };
@@ -64,11 +69,11 @@ final class JsonTokener {
 	static final int TOKEN_NUMBER = 9;
 	static final int TOKEN_OBJECT_START = 10;
 	static final int TOKEN_ARRAY_START = 11;
-	static final int TOKEN_SEMI_STRING = 12;
 	static final int TOKEN_VALUE_MIN = TOKEN_NULL;
 
 	/**
-	 * A {@link Reader} that reads a UTF8 stream without decoding it for performance.
+	 * A {@link Reader} that reads a UTF8 stream without decoding it for
+	 * performance.
 	 */
 	private static final class PseudoUtf8Reader extends Reader {
 		private final InputStream buffered;
@@ -82,7 +87,7 @@ final class JsonTokener {
 		public int read(char[] cbuf, int off, int len) throws IOException {
 			int r = buffered.read(buf, off, len);
 			for (int i = off; i < off + r; i++)
-				cbuf[i] = (char)buf[i];
+				cbuf[i] = (char) buf[i];
 			return r;
 		}
 
@@ -90,15 +95,15 @@ final class JsonTokener {
 		public void close() throws IOException {
 		}
 	}
-	
+
 	JsonTokener(Reader reader) throws JsonParserException {
 		this.reader = reader;
 		this.utf8 = false;
 		init();
 	}
-	
+
 	JsonTokener(InputStream stm) throws JsonParserException {
-		final InputStream buffered = (stm instanceof BufferedInputStream || stm instanceof ByteArrayInputStream) 
+		final InputStream buffered = (stm instanceof BufferedInputStream || stm instanceof ByteArrayInputStream)
 				? stm
 				: new BufferedInputStream(stm);
 		buffered.mark(4);
@@ -176,30 +181,17 @@ final class JsonTokener {
 
 		fixupAfterRawBufferRead();
 
-		// The token shouldn't end with something other than an ASCII letter
-		switch (peekChar()) {
-		case ',':
-		case ':':
-		case '{':
-		case '}':
-		case '[':
-		case ']':
-		case ' ':
-		case '\n':
-		case '\r':
-		case '\t':
-			break;
-		default:
+		// The token should end with something other than an ASCII letter
+		if (isAsciiLetter(peekChar()))
 			throw createHelpfulException(first, expected, expected.length);
-		}
 	}
 
 	/**
 	 * Steps through to the end of the current number token (a non-digit token).
 	 */
 	void consumeTokenNumber(char savedChar) throws JsonParserException {
-		reusableBuffer.setLength(0);
-		reusableBuffer.append(savedChar);
+		reusableBuffer.clear();
+		reusableBuffer.put(savedChar);
 		isDouble = false;
 
 		// The JSON spec is way stricter about number formats than
@@ -213,9 +205,8 @@ final class JsonTokener {
 		} else {
 			state = 2;
 		}
-		
-		outer:
-		while (true) {
+
+		outer: while (true) {
 			int n = ensureBuffer(BUFFER_ROOM);
 			if (n == 0)
 				break outer;
@@ -226,296 +217,176 @@ final class JsonTokener {
 					break outer;
 
 				int ns = -1;
-				sw:
-				switch (state) {
-				case 1: // start leading negative
-					if (nc == '0') {
-						ns = 3; break sw;
-					}
-					if (nc > '0' && nc <= '9') {
-						ns = 2; break sw;
-					}
-					break;
-				case 2: // no leading zero
-				case 3: // leading zero
-					if ((nc >= '0' && nc <= '9') && state == 2) {
-						ns = 2; break sw;
-					}
-					if (nc == '.') {
-						isDouble = true;
-						ns = 4; break sw;
-					}
-					if (nc == 'e' || nc == 'E') {
-						isDouble = true;
-						ns = 6; break sw;
-					}
-					break;
-				case 4: // after period
-				case 5: // after period, one digit read
-					if (nc >= '0' && nc <= '9') {
-						ns = 5; break sw;
-					}
-					if ((nc == 'e' || nc == 'E') && state == 5) {
-						isDouble = true;
-						ns = 6; break sw;
-					}
-					break;
-				case 6: // after exponent
-				case 7: // after exponent and sign
-					if (nc == '+' || nc == '-' && state == 6) {
-						ns = 7; break sw;
-					}
-					if (nc >= '0' && nc <= '9') {
-						ns = 8; break sw;
-					}
-					break;
-				case 8: // after digits
-					if (nc >= '0' && nc <= '9') {
-						ns = 8; break sw;
-					}
-					break;
-				default:
-					assert false : "Impossible"; // will throw malformed number
+				sw: switch (state) {
+					case 1: // start leading negative
+						if (nc == '0') {
+							ns = 3;
+							break sw;
+						}
+						if (nc > '0' && nc <= '9') {
+							ns = 2;
+							break sw;
+						}
+						break;
+					case 2: // no leading zero
+					case 3: // leading zero
+						if ((nc >= '0' && nc <= '9') && state == 2) {
+							ns = 2;
+							break sw;
+						}
+						if (nc == '.') {
+							isDouble = true;
+							ns = 4;
+							break sw;
+						}
+						if (nc == 'e' || nc == 'E') {
+							isDouble = true;
+							ns = 6;
+							break sw;
+						}
+						break;
+					case 4: // after period
+					case 5: // after period, one digit read
+						if (nc >= '0' && nc <= '9') {
+							ns = 5;
+							break sw;
+						}
+						if ((nc == 'e' || nc == 'E') && state == 5) {
+							isDouble = true;
+							ns = 6;
+							break sw;
+						}
+						break;
+					case 6: // after exponent
+					case 7: // after exponent and sign
+						if (nc == '+' || nc == '-' && state == 6) {
+							ns = 7;
+							break sw;
+						}
+						if (nc >= '0' && nc <= '9') {
+							ns = 8;
+							break sw;
+						}
+						break;
+					case 8: // after digits
+						if (nc >= '0' && nc <= '9') {
+							ns = 8;
+							break sw;
+						}
+						break;
+					default:
+						assert false : "Impossible"; // will throw malformed number
 				}
-				reusableBuffer.append(nc);
+				reusableBuffer.put(nc);
 				index++;
 				if (ns == -1)
 					throw createParseException(null, "Malformed number: " + reusableBuffer, true);
 				state = ns;
 			}
 		}
-		
+
 		if (state != 2 && state != 3 && state != 5 && state != 8)
 			throw createParseException(null, "Malformed number: " + reusableBuffer, true);
-		
+
 		// Special case for -0
 		if (state == 3 && savedChar == '-')
 			isDouble = true;
-		
+
 		fixupAfterRawBufferRead();
 	}
 
 	/**
-	 * Steps through to the end of the current string token (the unescaped double quote).
+	 * Steps through to the end of the current string token (the unescaped double
+	 * quote).
 	 */
-	void consumeTokenString(int cc) throws JsonParserException {
-		reusableBuffer.setLength(0);
-		
+	void consumeTokenString() throws JsonParserException {
+		reusableBuffer.position(0);
+
 		// Assume no escapes or UTF-8 in the string to start (fast path)
-		start:
-		while (true) {
+		start: while (true) {
 			int n = ensureBuffer(BUFFER_ROOM);
 			if (n == 0)
 				throw createParseException(null, "String was not terminated before end of input", true);
-			
+
 			for (int i = 0; i < n; i++) {
 				char c = stringChar();
-				if (c == cc) {
+				if (c == '"') {
 					// Use the index before we fixup
-					reusableBuffer.append(buffer, index - i - 1, i);
+					expandBufferIfNeeded(i);
+					reusableBuffer.put(buffer, index - i - 1, i);
 					fixupAfterRawBufferRead();
 					return;
 				}
 				if (c == '\\' || (utf8 && (c & 0x80) != 0)) {
-					reusableBuffer.append(buffer, index - i - 1, i);
+					expandBufferIfNeeded(i);
+					reusableBuffer.put(buffer, index - i - 1, i);
 					index--;
 					break start;
 				}
 			}
-			
-			reusableBuffer.append(buffer, index - n, n);
+
+			expandBufferIfNeeded(n);
+			reusableBuffer.put(buffer, index - n, n);
 		}
-		
-		outer:
-		while (true) {
+
+		outer: while (true) {
 			int n = ensureBuffer(BUFFER_ROOM);
 			if (n == 0)
 				throw createParseException(null, "String was not terminated before end of input", true);
-	
+
 			int end = index + n;
 			while (index < end) {
+				// Ensure at least 1 char of space for upcoming output (common case). Escapes
+				// and
+				// UTF-8 multi-byte sequences will further ensure space as needed.
+				expandBufferIfNeeded(1);
 				char c = stringChar();
-				
+
 				if (utf8 && (c & 0x80) != 0) {
 					// If it's a UTF-8 codepoint, we know it won't have special meaning
 					consumeTokenStringUtf8Char(c);
 					continue outer;
 				}
-	
+
 				switch (c) {
-				case '"':
-				case '\'':
-					if (c == cc) {
+					case '\"':
 						fixupAfterRawBufferRead();
 						return;
-					} else {
-						reusableBuffer.append(c);
-						break;
-					}
-				case '\\':
-					// Ensure that we have at least MAX_ESCAPE here in the buffer
-					if (end - index < MAX_ESCAPE) {
-						// Re-adjust the buffer end, unlikely path
-						n = ensureBuffer(MAX_ESCAPE);
-						end = index + n;
-						// Make sure that there's enough chars for a \\uXXXX escape
-						if (buffer[index] == 'u' && n < MAX_ESCAPE) {
-							index = bufferLength; // Reset index to last valid location
-							throw createParseException(null, "EOF encountered in the middle of a string escape", false);
-						}
-					}
-					char escape = buffer[index++];
-					switch (escape) {
-					case 'b':
-						reusableBuffer.append('\b');
-						break;
-					case 'f':
-						reusableBuffer.append('\f');
-						break;
-					case 'n':
-						reusableBuffer.append('\n');
-						break;
-					case 'r':
-						reusableBuffer.append('\r');
-						break;
-					case 't':
-						reusableBuffer.append('\t');
-						break;
-					case '"':
-					case '\'':
-					case '/':
 					case '\\':
-						reusableBuffer.append(escape);
-						break;
-					case 'u':
-						int escaped = 0;
-	
-						for (int j = 0; j < 4; j++) {
-							escaped <<= 4;
-							int digit = buffer[index++];
-							if (digit >= '0' && digit <= '9') {
-								escaped |= (digit - '0');
-							} else if (digit >= 'A' && digit <= 'F') {
-								escaped |= (digit - 'A') + 10;
-							} else if (digit >= 'a' && digit <= 'f') {
-								escaped |= (digit - 'a') + 10;
-							} else {
-								throw createParseException(null, "Expected unicode hex escape character: "
-									+ (char)digit + " (" + digit + ")", false);
+						// Ensure that we have at least MAX_ESCAPE here in the buffer
+						if (end - index < MAX_ESCAPE) {
+							// Re-adjust the buffer end, unlikely path
+							n = ensureBuffer(MAX_ESCAPE);
+							end = index + n;
+							// Make sure that there's enough chars for a \\uXXXX escape
+							if (buffer[index] == 'u' && n < MAX_ESCAPE) {
+								index = bufferLength; // Reset index to last valid location
+								throw createParseException(null,
+										"EOF encountered in the middle of a string escape",
+										false);
 							}
 						}
-	
-						reusableBuffer.append((char)escaped);
-						break;
-					default:
-						throw createParseException(null, "Invalid escape: \\" + escape, false);
-					}
-					break;
-				default:
-					reusableBuffer.append(c);
-				}
-			}
-			
-			if (index > bufferLength) {
-				index = bufferLength; // Reset index to last valid location
-				throw createParseException(null, "EOF encountered in the middle of a string escape", false);
-			}
-		}
-	}
-
-	void consumeTokenSemiString() throws JsonParserException {
-		reusableBuffer.setLength(0);
-
-		start:
-		while (true) {
-			int n = ensureBuffer(BUFFER_ROOM);
-			if (n == 0)
-				throw createParseException(null, "String was not terminated before end of input", true);
-
-			for (int i = 0; i < n; i++) {
-				char c = stringChar();
-				if (isWhitespace(c) || c == ':') {
-					// Use the index before we fixup
-					reusableBuffer.append(buffer, index - i - 1, i);
-					fixupAfterRawBufferRead();
-					return;
-				}
-				if (c == '\\' || (utf8 && (c & 0x80) != 0)) {
-					reusableBuffer.append(buffer, index - i - 1, i);
-					index--;
-					break start;
-				}
-				if (c == '[' || c == ']' || c == '{' || c == '}' || c == ',') {
-					throw createParseException(null, "Invalid character in semi-string: " + c, false);
-				}
-			}
-
-			reusableBuffer.append(buffer, index - n, n);
-		}
-
-		outer:
-		while (true) {
-			int n = ensureBuffer(BUFFER_ROOM);
-			if (n == 0)
-				throw createParseException(null, "String was not terminated before end of input", true);
-
-			int end = index + n;
-			while (index < end) {
-				char c = stringChar();
-
-				if (utf8 && (c & 0x80) != 0) {
-					// If it's a UTF-8 codepoint, we know it won't have special meaning
-					consumeTokenStringUtf8Char(c);
-					continue outer;
-				}
-
-				switch (c) {
-				case ' ':
-				case '\n':
-				case '\r':
-				case '\t':
-				case ':':
-					fixupAfterRawBufferRead();
-					return;
-				case '[':
-				case ']':
-				case '{':
-				case '}':
-				case ',':
-					throw createParseException(null, "Invalid character in semi-string: " + c, false);
-				case '\\':
-					// Ensure that we have at least MAX_ESCAPE here in the buffer
-					if (end - index < MAX_ESCAPE) {
-						// Re-adjust the buffer end, unlikely path
-						n = ensureBuffer(MAX_ESCAPE);
-						end = index + n;
-						// Make sure that there's enough chars for a \\uXXXX escape
-						if (buffer[index] == 'u' && n < MAX_ESCAPE) {
-							index = bufferLength; // Reset index to last valid location
-							throw createParseException(null, "EOF encountered in the middle of a string escape", false);
-						}
-					}
-					char escape = buffer[index++];
-					switch (escape) {
-						case 'b':
-							reusableBuffer.append('\b');
-							break;
-						case 'f':
-							reusableBuffer.append('\f');
-							break;
-						case 'n':
-							reusableBuffer.append('\n');
-							break;
-						case 'r':
-							reusableBuffer.append('\r');
-							break;
-						case 't':
-							reusableBuffer.append('\t');
+						char escape = buffer[index++];
+						switch (escape) {
+							case 'b':
+								reusableBuffer.put('\b');
+								break;
+							case 'f':
+								reusableBuffer.put('\f');
+								break;
+							case 'n':
+								reusableBuffer.put('\n');
+								break;
+							case 'r':
+								reusableBuffer.put('\r');
+								break;
+							case 't':
+								reusableBuffer.put('\t');
 								break;
 							case '"':
 							case '/':
 							case '\\':
-								reusableBuffer.append(escape);
+								reusableBuffer.put(escape);
 								break;
 							case 'u':
 								int escaped = 0;
@@ -530,25 +401,28 @@ final class JsonTokener {
 									} else if (digit >= 'a' && digit <= 'f') {
 										escaped |= (digit - 'a') + 10;
 									} else {
-										throw createParseException(null, "Expected unicode hex escape character: "
-												+ (char)digit + " (" + digit + ")", false);
+										throw createParseException(null,
+												"Expected unicode hex escape character: "
+												+ (char) digit + " (" + digit + ")", false);
 									}
 								}
 
-								reusableBuffer.append((char)escaped);
+								reusableBuffer.put((char) escaped);
 								break;
 							default:
 								throw createParseException(null, "Invalid escape: \\" + escape, false);
 						}
 						break;
 					default:
-						reusableBuffer.append(c);
+						reusableBuffer.put(c);
 				}
 			}
 
 			if (index > bufferLength) {
 				index = bufferLength; // Reset index to last valid location
-				throw createParseException(null, "EOF encountered in the middle of a string escape", false);
+				throw createParseException(null,
+						"EOF encountered in the middle of a string escape",
+						false);
 			}
 		}
 	}
@@ -557,75 +431,82 @@ final class JsonTokener {
 	private void consumeTokenStringUtf8Char(char c) throws JsonParserException {
 		ensureBuffer(5);
 
+		// Worst case (supplementary plane) decodes to a surrogate pair (2 chars)
+		expandBufferIfNeeded(2);
+
 		// Hand-UTF8-decoding
 		switch (c & 0xf0) {
-		case 0x80:
-		case 0x90:
-		case 0xa0:
-		case 0xb0:
-			throw createParseException(null,
-					"Illegal UTF-8 continuation byte: 0x" + Integer.toHexString(c & 0xff), false);
-		case 0xc0:
-			// Check for illegal C0 and C1 bytes
-			if ((c & 0xe) == 0)
-				throw createParseException(null, "Illegal UTF-8 byte: 0x" + Integer.toHexString(c & 0xff),
-						false);
-			// fall-through
-		case 0xd0:
-			c = (char)((c & 0x1f) << 6 | (buffer[index++] & 0x3f));
-			reusableBuffer.append(c);
-			utf8adjust++;
-			break;
-		case 0xe0:
-			c = (char)((c & 0x0f) << 12 | (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f));
-			utf8adjust += 2;
-			// Check for illegally-encoded surrogate - http://unicode.org/faq/utf_bom.html#utf8-4
-			if ((c >= '\ud800' && c <= '\udbff') || (c >= '\udc00' && c <= '\udfff'))
-				throw createParseException(null, "Illegal UTF-8 codepoint: 0x" + Integer.toHexString(c),
-						false);
-			reusableBuffer.append(c);
-			break;
-		case 0xf0:
-			if ((c & 0xf) >= 5)
-				throw createParseException(null, "Illegal UTF-8 byte: 0x" + Integer.toHexString(c & 0xff),
-						false);
-
-			// Extended char
-			switch ((c & 0xc) >> 2) {
-			case 0:
-			case 1:
-				reusableBuffer.appendCodePoint((c & 7) << 18 | (buffer[index++] & 0x3f) << 12
-						| (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f));
-				utf8adjust += 3;
+			case 0x80:
+			case 0x90:
+			case 0xa0:
+			case 0xb0:
+				throw createParseException(null,
+						"Illegal UTF-8 continuation byte: 0x" + Integer.toHexString(c & 0xff), false);
+			case 0xc0:
+				// Check for illegal C0 and C1 bytes
+				if ((c & 0xe) == 0)
+					throw createParseException(null, "Illegal UTF-8 byte: 0x" + Integer.toHexString(c & 0xff),
+							false);
+				// fall-through
+			case 0xd0:
+				c = (char) ((c & 0x1f) << 6 | (buffer[index++] & 0x3f));
+				reusableBuffer.put(c);
+				utf8adjust++;
 				break;
-			case 2:
-				// TODO: \uFFFD (replacement char)
-				int codepoint = (c & 3) << 24 | (buffer[index++] & 0x3f) << 18 | (buffer[index++] & 0x3f) << 12
-						| (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f);
-				throw createParseException(null,
-						"Unable to represent codepoint 0x" + Integer.toHexString(codepoint)
-								+ " in a Java string", false);
-			case 3:
-				codepoint = (c & 1) << 30 | (buffer[index++] & 0x3f) << 24 | (buffer[index++] & 0x3f) << 18
-						| (buffer[index++] & 0x3f) << 12 | (buffer[index++] & 0x3f) << 6
-						| (buffer[index++] & 0x3f);
-				throw createParseException(null,
-						"Unable to represent codepoint 0x" + Integer.toHexString(codepoint)
-								+ " in a Java string", false);
+			case 0xe0:
+				c = (char) ((c & 0x0f) << 12 | (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f));
+				utf8adjust += 2;
+				// Check for illegally-encoded surrogate -
+				// http://unicode.org/faq/utf_bom.html#utf8-4
+				if ((c >= '\ud800' && c <= '\udbff') || (c >= '\udc00' && c <= '\udfff'))
+					throw createParseException(null, "Illegal UTF-8 codepoint: 0x" + Integer.toHexString(c),
+							false);
+				reusableBuffer.put(c);
+				break;
+			case 0xf0:
+				if ((c & 0xf) >= 5)
+					throw createParseException(null, "Illegal UTF-8 byte: 0x" + Integer.toHexString(c & 0xff),
+							false);
+
+				// Extended char
+				switch ((c & 0xc) >> 2) {
+					case 0:
+					case 1:
+						reusableBuffer.put(Character.toChars((c & 7) << 18 | (buffer[index++] & 0x3f) << 12
+								| (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f)));
+						utf8adjust += 3;
+						break;
+					case 2:
+						// TODO: \uFFFD (replacement char)
+						int codepoint = (c & 3) << 24 | (buffer[index++] & 0x3f) << 18 | (buffer[index++] & 0x3f) << 12
+								| (buffer[index++] & 0x3f) << 6 | (buffer[index++] & 0x3f);
+						throw createParseException(null,
+								"Unable to represent codepoint 0x" + Integer.toHexString(codepoint)
+										+ " in a Java string",
+								false);
+					case 3:
+						codepoint = (c & 1) << 30 | (buffer[index++] & 0x3f) << 24 | (buffer[index++] & 0x3f) << 18
+								| (buffer[index++] & 0x3f) << 12 | (buffer[index++] & 0x3f) << 6
+								| (buffer[index++] & 0x3f);
+						throw createParseException(null,
+								"Unable to represent codepoint 0x" + Integer.toHexString(codepoint)
+										+ " in a Java string",
+								false);
+					default:
+						assert false : "Impossible";
+				}
+				break;
 			default:
-				assert false : "Impossible";
-			}
-			break;
-		default:
-			// Regular old byte
-			break;
+				// Regular old byte
+				break;
 		}
 		if (index > bufferLength)
 			throw createParseException(null, "UTF-8 codepoint was truncated", false);
 	}
 
 	/**
-	 * Advances a character, throwing if it is illegal in the context of a JSON string.
+	 * Advances a character, throwing if it is illegal in the context of a JSON
+	 * string.
 	 */
 	private char stringChar() throws JsonParserException {
 		char c = buffer[index++];
@@ -692,7 +573,8 @@ final class JsonTokener {
 	}
 
 	/**
-	 * Ensures that there is enough room in the buffer to directly access the next N chars via buffer[].
+	 * Ensures that there is enough room in the buffer to directly access the next N
+	 * chars via buffer[].
 	 */
 	int ensureBuffer(int n) throws JsonParserException {
 		// We're good here
@@ -700,7 +582,8 @@ final class JsonTokener {
 			return n;
 		}
 
-		// Nope, we need to read more, but we also have to retain whatever buffer we have
+		// Nope, we need to read more, but we also have to retain whatever buffer we
+		// have
 		if (index > 0) {
 			charOffset += index;
 			bufferLength = bufferLength - index;
@@ -748,7 +631,7 @@ final class JsonTokener {
 
 		return c;
 	}
-	
+
 	int advanceCharFast() {
 		int c = buffer[index];
 		if (c == '\n') {
@@ -760,7 +643,7 @@ final class JsonTokener {
 		index++;
 		return c;
 	}
-	
+
 	private void consumeWhitespace() throws JsonParserException {
 		int n;
 		do {
@@ -781,12 +664,13 @@ final class JsonTokener {
 		} while (n > 0);
 		eof = true;
 	}
-	
+
 	/**
-	 * Consumes a token, first eating up any whitespace ahead of it. Note that number tokens are not necessarily valid
+	 * Consumes a token, first eating up any whitespace ahead of it. Note that
+	 * number tokens are not necessarily valid
 	 * numbers.
 	 */
-	int advanceToToken(boolean allowSemiString) throws JsonParserException {
+	int advanceToToken() throws JsonParserException {
 		int c = advanceChar();
 		while (isWhitespace(c))
 			c = advanceChar();
@@ -794,102 +678,69 @@ final class JsonTokener {
 		tokenCharPos = index + charOffset - rowPos - utf8adjust;
 		tokenCharOffset = charOffset + index;
 
-		int oldIndex = index;
 		int token;
 		switch (c) {
-		case -1:
-			return TOKEN_EOF;
-		case '[':
-			token = TOKEN_ARRAY_START;
-			break;
-		case ']':
-			token = TOKEN_ARRAY_END;
-			break;
-		case ',':
-			token = TOKEN_COMMA;
-			break;
-		case ':':
-			token = TOKEN_COLON;
-			break;
-		case '{':
-			token = TOKEN_OBJECT_START;
-			break;
-		case '}':
-			token = TOKEN_OBJECT_END;
-			break;
-		case 't':
-			try {
+			case -1:
+				return TOKEN_EOF;
+			case '[':
+				token = TOKEN_ARRAY_START;
+				break;
+			case ']':
+				token = TOKEN_ARRAY_END;
+				break;
+			case ',':
+				token = TOKEN_COMMA;
+				break;
+			case ':':
+				token = TOKEN_COLON;
+				break;
+			case '{':
+				token = TOKEN_OBJECT_START;
+				break;
+			case '}':
+				token = TOKEN_OBJECT_END;
+				break;
+			case 't':
 				consumeKeyword((char) c, JsonTokener.TRUE);
 				token = TOKEN_TRUE;
-			} catch (JsonParserException e) {
-				if (allowSemiString) {
-					index = oldIndex - 1;
-					consumeTokenSemiString();
-					token = TOKEN_SEMI_STRING;
-				} else throw e;
-			}
-			break;
-		case 'f':
-			try {
-				consumeKeyword((char)c, JsonTokener.FALSE);
-				token = TOKEN_FALSE;
-			} catch (JsonParserException e) {
-				if (allowSemiString) {
-					index = oldIndex - 1;
-					consumeTokenSemiString();
-					token = TOKEN_SEMI_STRING;
-				} else throw e;
-			}
-			break;
-		case 'n':
-			try {
-				consumeKeyword((char)c, JsonTokener.NULL);
-				token = TOKEN_NULL;
-			} catch (JsonParserException e) {
-				if (allowSemiString) {
-					index = oldIndex - 1;
-					consumeTokenSemiString();
-					token = TOKEN_SEMI_STRING;
-				} else throw e;
-			}
-			break;
-		case '"':
-		case '\'':
-			consumeTokenString(c);
-			token = TOKEN_STRING;
-			break;
-		case '-':
-		case '0':
-		case '1':
-		case '2':
-		case '3':
-		case '4':
-		case '5':
-		case '6':
-		case '7':
-		case '8':
-		case '9':
-			consumeTokenNumber((char)c);
-			token = TOKEN_NUMBER;
-			break;
-		case '+':
-		case '.':
-			throw createParseException(null, "Numbers may not start with '" + (char)c + "'", true);
-		default:
-			if (allowSemiString) {
-				index--;
-				consumeTokenSemiString();
-				token = TOKEN_SEMI_STRING;
 				break;
-			} else {
+			case 'f':
+				consumeKeyword((char) c, JsonTokener.FALSE);
+				token = TOKEN_FALSE;
+				break;
+			case 'n':
+				consumeKeyword((char) c, JsonTokener.NULL);
+				token = TOKEN_NULL;
+				break;
+			case '\"':
+				consumeTokenString();
+				token = TOKEN_STRING;
+				break;
+			case '-':
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':
+				consumeTokenNumber((char) c);
+				token = TOKEN_NUMBER;
+				break;
+			case '+':
+			case '.':
+				throw createParseException(null, "Numbers may not start with '" + (char) c + "'", true);
+			default:
 				if (isAsciiLetter(c))
-					throw createHelpfulException((char)c, null, 0);
+					throw createHelpfulException((char) c, null, 0);
 
-				throw createParseException(null, "Unexpected character: " + (char)c, true);
-			}
+				throw createParseException(null, "Unexpected character: " + (char) c, true);
 		}
-		
-//		consumeWhitespace();
+
+		// consumeWhitespace();
 		return token;
 	}
 
@@ -908,6 +759,18 @@ final class JsonTokener {
 			eof = refillBuffer();
 	}
 
+	private void expandBufferIfNeeded(int size) {
+		if (reusableBuffer.remaining() < size) {
+			int oldPos = reusableBuffer.position();
+			int increment = Math.max(512, size - reusableBuffer.remaining());
+			CharBuffer newBuffer = CharBuffer.allocate(reusableBuffer.capacity() + increment);
+			reusableBuffer.flip(); // position -> 0, limit -> oldPos
+			newBuffer.put(reusableBuffer); // copy all existing data
+			reusableBuffer = newBuffer;
+			reusableBuffer.position(oldPos); // restore write position at end
+		}
+	}
+
 	/**
 	 * Throws a helpful exception based on the current alphanumeric token.
 	 */
@@ -919,14 +782,30 @@ final class JsonTokener {
 
 		// Consume the whole pseudo-token to make a better error message
 		while (isAsciiLetter(peekChar()) && errorToken.length() < 15)
-			errorToken.append((char)advanceChar());
+			errorToken.append((char) advanceChar());
 
 		return createParseException(null, "Unexpected token '" + errorToken + "'"
 				+ (expected == null ? "" : ". Did you mean '" + first + new String(expected) + "'?"), true);
 	}
 
 	/**
-	 * Creates a {@link JsonParserException} and fills it from the current line and char position.
+	 * Releases resources used by this JsonTokener. Should be called when done
+	 * tokenizing.
+	 */
+	@Override
+	public void close() throws IOException {
+		if (reusableBuffer != null) {
+			CharBufferPool.release(reusableBuffer);
+			reusableBuffer = null;
+		}
+		if (reader != null) {
+			reader.close();
+		}
+	}
+
+	/**
+	 * Creates a {@link JsonParserException} and fills it from the current line and
+	 * char position.
 	 */
 	JsonParserException createParseException(Exception e, String message, boolean tokenPos) {
 		if (tokenPos)

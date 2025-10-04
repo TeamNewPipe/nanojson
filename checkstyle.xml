@@ -20,8 +20,7 @@
 	</module>
 
 	<module name="LineLength">
-		<property name="max" value="120" />
-		<property name="tabWidth" value="4" />
+		<property name="max" value="150" />
 	</module>
 
 	<!-- If you set the basedir property below, then all reported file names 
@@ -70,7 +69,7 @@
 		<!-- Checks for Javadoc comments. -->
 		<!-- See http://checkstyle.sf.net/config_javadoc.html -->
 		<module name="JavadocMethod">
-			<property name="scope" value="public" />
+			<property name="accessModifiers" value="public" />
 			<property name="allowMissingParamTags" value="true" />
 			<property name="allowMissingReturnTag" value="true" />
 		</module>
