@@ -762,7 +762,16 @@ final class JsonTokener implements Closeable {
 	private void expandBufferIfNeeded(int size) {
 		if (reusableBuffer.remaining() < size) {
 			int oldPos = reusableBuffer.position();
-			int increment = Math.max(512, size - reusableBuffer.remaining());
+			int increment = Math.max(
+					// don't reallocate too small parts
+					512,
+					Math.max(
+							// allocate at least as much as needed
+							size - reusableBuffer.remaining(),
+							// ensure exponential growth so that it's O(n) amortized
+							(int) (reusableBuffer.capacity() * 0.3)
+					)
+			);
 			CharBuffer newBuffer = CharBuffer.allocate(reusableBuffer.capacity() + increment);
 			reusableBuffer.flip(); // position -> 0, limit -> oldPos
 			newBuffer.put(reusableBuffer); // copy all existing data
